@@ -11,4 +11,5 @@ public interface BarbeiroRepository extends JpaRepository<Barbeiro, Long> {
     List<Barbeiro> findByBarbeariaIdOrderByNomeAsc(Long barbeariaId);
     Optional<Barbeiro> findByIdAndBarbeariaId(Long id, Long barbeariaId);
     long countByBarbeariaId(Long barbeariaId);
+    long countByBarbeariaIdAndAtivoTrue(Long barbeariaId);
 }

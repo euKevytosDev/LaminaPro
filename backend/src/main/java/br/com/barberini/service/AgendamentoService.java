@@ -164,9 +164,13 @@ public class AgendamentoService {
                 .toList();
     }
 
-    /** Dono fecha o atendimento: finalizado (com valor opcional) ou não compareceu. */
+    /** Dono fecha o atendimento: finalizado (com valor/forma opcionais) ou não compareceu. */
     @Transactional
-    public Map<String, Object> atualizarStatus(Long id, StatusAgendamento novoStatus, BigDecimal valorCobrado) {
+    public Map<String, Object> atualizarStatus(
+            Long id,
+            StatusAgendamento novoStatus,
+            BigDecimal valorCobrado,
+            FormaPagamento formaPagamento) {
         Barbearia loja = tenant.exigirDonoComLoja();
         if (novoStatus == StatusAgendamento.CANCELADO) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use o cancelamento para cancelar");
@@ -179,11 +183,16 @@ public class AgendamentoService {
         }
 
         a.setStatus(novoStatus);
-        if (novoStatus == StatusAgendamento.FINALIZADO && valorCobrado != null) {
-            if (valorCobrado.compareTo(BigDecimal.ZERO) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valor inválido");
+        if (novoStatus == StatusAgendamento.FINALIZADO) {
+            if (valorCobrado != null) {
+                if (valorCobrado.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valor inválido");
+                }
+                a.setPrecoCobrado(valorCobrado);
             }
-            a.setPrecoCobrado(valorCobrado);
+            if (formaPagamento != null) {
+                a.setFormaPagamento(formaPagamento);
+            }
         }
         return map(agendamentos.save(a));
     }
@@ -224,6 +233,7 @@ public class AgendamentoService {
         m.put("servicoPreco", a.getServico().getPreco());
         m.put("servicoDuracao", a.getServico().getDuracaoMin());
         m.put("valorCobrado", a.getPrecoCobrado() != null ? a.getPrecoCobrado() : a.getServico().getPreco());
+        m.put("formaPagamento", a.getFormaPagamento() != null ? a.getFormaPagamento().name() : null);
         if (a.getBarbearia() != null) {
             m.put("barbeariaId", a.getBarbearia().getId());
             m.put("slug", a.getBarbearia().getSlug());

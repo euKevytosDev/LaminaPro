@@ -526,6 +526,7 @@ window.Store = (() => {
         status: ag.status || "CONFIRMADO",
         semPreferencia: !!ag.semPreferencia,
         valorCobrado: ag.valorCobrado != null ? Number(ag.valorCobrado) : null,
+        formaPagamento: ag.formaPagamento || null,
         slug: ag.slug || currentSlug || null,
       };
     },
@@ -599,16 +600,31 @@ window.Store = (() => {
       });
     },
 
-    async donoAtualizarStatus(id, status, valorCobrado) {
+    async donoAtualizarStatus(id, status, valorCobrado, formaPagamento) {
       const body = { status };
       if (valorCobrado != null && valorCobrado !== "") {
         body.valorCobrado = Number(valorCobrado);
+      }
+      if (formaPagamento) {
+        body.formaPagamento = formaPagamento;
       }
       return window.API.put(`/api/dono/agendamentos/${id}/status`, body);
     },
 
     async donoResumo(inicio, fim) {
       return window.API.get(`/api/dono/resumo?inicio=${inicio}&fim=${fim}`);
+    },
+
+    async donoAssinaturaStatus() {
+      return window.API.get("/api/dono/assinatura/status");
+    },
+
+    async donoAssinaturaCatalogo() {
+      return window.API.get("/api/dono/assinatura/catalogo");
+    },
+
+    async donoCheckoutAssinatura(planoId) {
+      return window.API.post("/api/dono/assinatura/checkout", { planoId: planoId || "p_1_2_m" });
     },
 
     async donoBarbeiros() {
@@ -671,10 +687,6 @@ window.Store = (() => {
       const loja = await window.API.put("/api/dono/loja", body);
       aplicarBrandingLoja(loja);
       return loja;
-    },
-
-    async donoCheckoutAssinatura() {
-      return window.API.post("/api/dono/assinatura/checkout", {});
     },
   };
 })();

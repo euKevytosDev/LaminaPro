@@ -43,7 +43,29 @@ APP_SEED_DONO_EMAIL=dono@laminapro.app
 APP_SEED_DONO_SENHA=dono123
 APP_SEED_DONO_NOME=Dono LaminaPro
 GOOGLE_CLIENT_ID=868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com
+MERCADOPAGO_ACCESS_TOKEN=
+APP_ASSINATURA_WEBHOOK_URL=https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/assinatura/webhook
+APP_ASSINATURA_TRIAL_DIAS=14
 ```
+
+### Mercado Pago (assinatura da loja)
+
+Igual ao Pelada Oficial:
+
+1. Cole `MERCADOPAGO_ACCESS_TOKEN` nas envs da Northflank (produção).
+2. No painel do MP, configure a URL de notificação:
+   `https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/assinatura/webhook`
+3. No app: **Painel → Planos** (mensal recorrente / semestral / anual por faixa de barbeiros).
+4. Após pagar, retorno: `#/dono?pago=ok`
+
+Planos (base R$ 49,90):
+
+| Equipe | Mensal | Semestral | Anual |
+|--------|--------|-----------|-------|
+| 1 a 2 | 49,90 | 254,49 | 419,16 |
+| 3 a 5 | 68,90 | 351,39 | 578,76 |
+| 6 a 15 | 102,90 | 524,79 | 864,36 |
+| +15 | 137,90 | 703,29 | 1.158,36 |
 
 ### Front apontando pra API Northflank
 
@@ -61,6 +83,9 @@ Health: `https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/health`
 - Novo: `dono@laminapro.app` / `dono123`
 - Antigo (Neon): `dono@barberini.com` / `dono123`
 - Loja demo: `#/loja/demo`
+- Entry: **Sou dono** vs **Quero agendar** (cliente)
+
+Ao finalizar um corte no painel: informe **valor pago** + **Pix/Dinheiro/Cartão** → o app abre o **dashboard (Resumo)**.
 
 ## Login Google
 

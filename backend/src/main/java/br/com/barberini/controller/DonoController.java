@@ -89,7 +89,7 @@ public class DonoController {
     @PutMapping("/agendamentos/{id}/status")
     public Map<String, Object> atualizarStatus(
             @PathVariable Long id, @Valid @RequestBody AtualizarStatusRequest req) {
-        return agendamentos.atualizarStatus(id, req.status(), req.valorCobrado());
+        return agendamentos.atualizarStatus(id, req.status(), req.valorCobrado(), req.formaPagamento());
     }
 
     @GetMapping("/barbeiros")
@@ -151,8 +151,12 @@ public class DonoController {
         m.put("slug", b.getSlug());
         m.put("telefone", b.getTelefone());
         m.put("logoData", b.getLogoData());
-        m.put("plano", b.getPlano().name());
+        m.put("plano", b.getPlano() != null ? b.getPlano().normalizado().name() : "TRIAL");
+        m.put("planoRotulo", b.getPlano() != null ? b.getPlano().rotulo() : "Trial");
+        m.put("periodo", b.getPlanoPeriodo() != null ? b.getPlanoPeriodo() : "");
         m.put("statusAssinatura", b.getStatusAssinatura().name());
+        m.put("maxBarbeiros", b.getPlano() != null ? b.getPlano().maxBarbeiros() : 2);
+        m.put("planoExpiraEm", b.getPlanoExpiraEm() != null ? b.getPlanoExpiraEm().toString() : "");
         return m;
     }
 }

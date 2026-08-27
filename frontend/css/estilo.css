@@ -2366,10 +2366,34 @@ body {
 .entry-acoes {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   max-width: 400px;
   width: 100%;
   margin: 0 auto;
+}
+.entry-bloco {
+  border: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.entry-bloco-titulo {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--preto);
+}
+.entry-bloco-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+.entry-bloco-dono {
+  border-color: rgba(196,165,116,0.5);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.04);
 }
 .tela-entry .btn-login-principal {
   background: var(--preto);
@@ -2618,5 +2642,62 @@ body {
     margin: 0 auto;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
   }
+}
+
+/* ---------- planos / fechamento ---------- */
+.planos-status {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--linha);
+}
+.planos-status p {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+.planos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.plano-faixa {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid var(--linha);
+}
+.plano-faixa header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.plano-faixa h3 { margin: 0; font-size: 1rem; }
+.plano-faixa header span { font-size: 0.75rem; color: var(--texto-suave); }
+.plano-periodos { display: flex; flex-direction: column; gap: 8px; }
+.btn-plano {
+  text-align: left;
+  border: 1px solid var(--linha);
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  font: inherit;
+  display: grid;
+  gap: 2px;
+}
+.btn-plano:hover { border-color: #111; background: #fff; }
+.btn-plano strong { font-size: 0.9rem; }
+.btn-plano span { font-weight: 700; color: #111; }
+.btn-plano small { color: var(--texto-suave); font-size: 0.75rem; }
+.fechamento select.forma-pag {
+  border: 1px solid var(--linha);
+  border-radius: 8px;
+  padding: 8px;
+  font: inherit;
+  background: #fff;
 }
 

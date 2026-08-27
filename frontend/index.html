@@ -38,10 +38,15 @@
         <p class="login-subtitulo">Agenda para barbearias</p>
       </div>
       <div class="entry-acoes">
-        <button type="button" class="btn-login-principal" id="btn-entry-entrar">Entrar na minha loja</button>
-        <button type="button" class="btn-login-ghost" id="btn-entry-criar">Criar minha barbearia</button>
-        <div class="entry-agendar">
-          <p class="entry-agendar-rotulo">Agendar (informe o link da loja)</p>
+        <div class="entry-bloco entry-bloco-dono">
+          <p class="entry-bloco-titulo">Sou dono da barbearia</p>
+          <p class="entry-bloco-desc">Admin: painel, serviços, preços e agenda da loja</p>
+          <button type="button" class="btn-login-principal" id="btn-entry-dono">Entrar como dono</button>
+          <button type="button" class="btn-login-ghost" id="btn-entry-criar">Criar minha barbearia</button>
+        </div>
+        <div class="entry-bloco entry-bloco-cliente">
+          <p class="entry-bloco-titulo">Quero agendar</p>
+          <p class="entry-bloco-desc">Cliente: escolha a loja e marque o horário</p>
           <div class="entry-slug-row">
             <span class="entry-slug-prefix">#/loja/</span>
             <input type="text" id="entry-slug" placeholder="demo" autocomplete="off" maxlength="80" />
@@ -195,7 +200,7 @@
       <div class="aba-conteudo" id="aba-opcoes">
         <div class="opcoes-lista">
           <button type="button" class="opcao-item oculto" id="btn-painel-opcoes">📊 Painel do dono</button>
-          <button type="button" class="opcao-item oculto" id="btn-assinatura">✦ Assinar Lâmina Pro Solo R$ 49,90</button>
+          <button type="button" class="opcao-item oculto" id="btn-assinatura">✦ Planos Lâmina Pro</button>
           <button type="button" class="opcao-item" id="btn-relatar">🐛 Relatar um problema</button>
           <button type="button" class="opcao-item perigo" id="btn-sair">↩ Sair</button>
         </div>
@@ -210,6 +215,7 @@
           <button type="button" class="painel-nav-btn" data-secao="servicos">Serviços</button>
           <button type="button" class="painel-nav-btn" data-secao="bloqueios">Horários</button>
           <button type="button" class="painel-nav-btn" data-secao="loja">Loja</button>
+          <button type="button" class="painel-nav-btn" data-secao="planos">Planos</button>
         </nav>
         <div id="painel-conteudo" class="painel-conteudo"></div>
       </div>

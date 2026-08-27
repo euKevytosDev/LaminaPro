@@ -32,12 +32,24 @@ public class Barbearia {
     @Column(nullable = false, length = 20, columnDefinition = "varchar(20)")
     private PlanoBarbearia plano = PlanoBarbearia.TRIAL;
 
+    /** M = mensal, S = semestral, A = anual */
+    @Column(length = 8)
+    private String planoPeriodo;
+
+    private LocalDateTime planoExpiraEm;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, columnDefinition = "varchar(20)")
     private StatusAssinatura statusAssinatura = StatusAssinatura.TRIAL;
 
     @Column(length = 120)
     private String mercadoPagoPreapprovalId;
+
+    @Column(length = 80)
+    private String ultimoPagamentoMp;
+
+    @Column(length = 40)
+    private String pagamentoOrigem;
 
     @ColumnDefault("true")
     @Column(nullable = false)
@@ -65,12 +77,20 @@ public class Barbearia {
     public void setTelefone(String telefone) { this.telefone = telefone; }
     public PlanoBarbearia getPlano() { return plano; }
     public void setPlano(PlanoBarbearia plano) { this.plano = plano; }
+    public String getPlanoPeriodo() { return planoPeriodo; }
+    public void setPlanoPeriodo(String planoPeriodo) { this.planoPeriodo = planoPeriodo; }
+    public LocalDateTime getPlanoExpiraEm() { return planoExpiraEm; }
+    public void setPlanoExpiraEm(LocalDateTime planoExpiraEm) { this.planoExpiraEm = planoExpiraEm; }
     public StatusAssinatura getStatusAssinatura() { return statusAssinatura; }
     public void setStatusAssinatura(StatusAssinatura statusAssinatura) { this.statusAssinatura = statusAssinatura; }
     public String getMercadoPagoPreapprovalId() { return mercadoPagoPreapprovalId; }
     public void setMercadoPagoPreapprovalId(String mercadoPagoPreapprovalId) {
         this.mercadoPagoPreapprovalId = mercadoPagoPreapprovalId;
     }
+    public String getUltimoPagamentoMp() { return ultimoPagamentoMp; }
+    public void setUltimoPagamentoMp(String ultimoPagamentoMp) { this.ultimoPagamentoMp = ultimoPagamentoMp; }
+    public String getPagamentoOrigem() { return pagamentoOrigem; }
+    public void setPagamentoOrigem(String pagamentoOrigem) { this.pagamentoOrigem = pagamentoOrigem; }
     public boolean isAtivo() { return ativo; }
     public void setAtivo(boolean ativo) { this.ativo = ativo; }
     public LocalDateTime getCriadoEm() { return criadoEm; }

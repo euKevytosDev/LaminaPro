@@ -48,6 +48,10 @@ public class Agendamento {
     @Column(precision = 10, scale = 2)
     private BigDecimal precoCobrado;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, columnDefinition = "varchar(20)")
+    private FormaPagamento formaPagamento;
+
     // varchar explícito: evita ENUM/CHECK gerado pelo dialeto, que o ddl-auto nunca atualiza
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, columnDefinition = "varchar(20)")
@@ -83,6 +87,8 @@ public class Agendamento {
     public void setObservacao(String observacao) { this.observacao = observacao; }
     public BigDecimal getPrecoCobrado() { return precoCobrado; }
     public void setPrecoCobrado(BigDecimal precoCobrado) { this.precoCobrado = precoCobrado; }
+    public FormaPagamento getFormaPagamento() { return formaPagamento; }
+    public void setFormaPagamento(FormaPagamento formaPagamento) { this.formaPagamento = formaPagamento; }
     public StatusAgendamento getStatus() { return status; }
     public void setStatus(StatusAgendamento status) { this.status = status; }
     public boolean isSemPreferencia() { return semPreferencia; }

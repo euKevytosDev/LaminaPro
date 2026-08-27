@@ -179,14 +179,25 @@
 
   function parseHash() {
     const raw = (location.hash || "").replace(/^#/, "");
-    const path = raw.replace(/^\//, "");
+    const [pathOnly, query] = raw.split("?");
+    const path = (pathOnly || "").replace(/^\//, "");
+    const params = new URLSearchParams(query || "");
     if (!path || path === "/") return { tipo: "entry", slug: null };
     const parts = path.split("/").filter(Boolean);
     if (parts[0] === "loja" && parts[1]) {
       return { tipo: "loja", slug: parts[1].toLowerCase() };
     }
     if (parts[0] === "criar-loja") return { tipo: "criar-loja", slug: null };
-    if (parts[0] === "login") return { tipo: "login", slug: Store.getSlug() || null };
+    if (parts[0] === "login") {
+      return {
+        tipo: "login",
+        slug: Store.getSlug() || null,
+        intent: params.get("como") === "dono" ? "dono" : null,
+      };
+    }
+    if (parts[0] === "dono") {
+      return { tipo: "dono", slug: null, pago: params.get("pago") };
+    }
     return { tipo: "entry", slug: null };
   }
 
@@ -223,12 +234,24 @@
   function mostrarLogin(ctx = {}) {
     esconderTelas();
     show($("#tela-login"));
-    rotaAtual = { tipo: "login", slug: ctx.slug || Store.getSlug() || null };
+    rotaAtual = { tipo: "login", slug: ctx.slug || Store.getSlug() || null, intent: ctx.intent || null };
     const loja = Store.getLoja();
     const titulo = $("#login-marca-titulo");
     const sub = $("#login-marca-sub");
     const letra = $("#login-logo-letra");
-    if (rotaAtual.slug && loja?.nome) {
+    const authTitulo = $("#auth-titulo");
+
+    if (ctx.intent === "dono") {
+      if (titulo) titulo.textContent = P().nomeCurto;
+      if (sub) sub.textContent = "Acesso do dono / admin";
+      if (letra) {
+        letra.className = "brand-mark brand-mark-lg";
+        letra.innerHTML = BRAND_MARK(72);
+      }
+      if (authTitulo) authTitulo.textContent = "Entrar como dono";
+      $("#btn-auth-cadastro")?.classList.add("oculto");
+      alternarModoAuth(false);
+    } else if (rotaAtual.slug && loja?.nome) {
       if (titulo) titulo.textContent = loja.nome.toUpperCase();
       if (sub) sub.textContent = "Agende seu horário";
       if (letra) {
@@ -240,6 +263,7 @@
           letra.textContent = (loja.nome[0] || "L").toUpperCase();
         }
       }
+      $("#btn-auth-cadastro")?.classList.remove("oculto");
     } else {
       if (titulo) titulo.textContent = P().nomeCurto;
       if (sub) sub.textContent = P().tagline;
@@ -247,6 +271,7 @@
         letra.className = "brand-mark brand-mark-lg";
         letra.innerHTML = BRAND_MARK(72);
       }
+      $("#btn-auth-cadastro")?.classList.remove("oculto");
     }
     initGoogleSignIn();
   }
@@ -349,7 +374,21 @@
     }
 
     if (rota.tipo === "login") {
-      mostrarLogin({ slug: Store.getSlug() });
+      mostrarLogin({ slug: Store.getSlug(), intent: rota.intent });
+      return;
+    }
+
+    if (rota.tipo === "dono") {
+      const u = usuarioLogado();
+      if (rota.pago === "ok") toast("Pagamento ok! A assinatura confirma em instantes.");
+      if (rota.pago === "falhou") toast("Pagamento não concluído. Tente de novo nos Planos.");
+      if (u && u.papel === "DONO" && Store.temAuthReal() && !u.demo) {
+        if (u.slug) Store.setLoja(u.slug);
+        painelSecao = "planos";
+        await entrarApp({ modo: "dono", tab: "painel" });
+        return;
+      }
+      mostrarLogin({ intent: "dono" });
       return;
     }
 
@@ -376,11 +415,14 @@
     const el = $("#header-user");
     if (!el) return;
     if (!u) {
-      el.textContent = "Visitante";
+      el.textContent = rotaAtual.tipo === "loja" ? "Cliente · visitante" : "Visitante";
       return;
     }
-    const papel = u.papel === "DONO" ? "Dono" : "Cliente";
-    el.textContent = `${papel} | ${u.nome}`;
+    if (rotaAtual.tipo === "dono" || (u.papel === "DONO" && Store.isDono())) {
+      el.textContent = `Dono · ${u.nome}`;
+      return;
+    }
+    el.textContent = `Cliente · ${u.nome}`;
   }
 
   function atualizarNavDono() {
@@ -1100,6 +1142,7 @@
     if (painelSecao === "servicos") renderPainelServicos();
     if (painelSecao === "bloqueios") renderPainelBloqueios();
     if (painelSecao === "loja") renderPainelLoja();
+    if (painelSecao === "planos") renderPainelPlanos();
   }
 
   function renderPainelNav() {
@@ -1158,7 +1201,7 @@
         <label>Até<input type="date" id="resumo-ate" value="${fim}" /></label>
         <button type="button" id="btn-resumo-aplicar">Aplicar</button>
       </div>
-      <button type="button" class="btn-assinatura-painel" id="btn-assinatura-resumo">✦ Assinar Lâmina Pro Solo R$ 49,90</button>
+      <button type="button" class="btn-assinatura-painel" id="btn-assinatura-resumo">✦ Ver planos Lâmina Pro</button>
       <div id="resumo-dados"><p class="carregando-slots">Carregando…</p></div>`;
 
     $$(".chip-periodo", box).forEach((b) => {
@@ -1178,7 +1221,10 @@
       carregarResumo();
     });
 
-    $("#btn-assinatura-resumo", box)?.addEventListener("click", iniciarCheckoutAssinatura);
+    $("#btn-assinatura-resumo", box)?.addEventListener("click", () => {
+      painelSecao = "planos";
+      renderPainel();
+    });
 
     carregarResumo();
   }
@@ -1373,15 +1419,32 @@
         btn.addEventListener("click", async () => {
           const { id, status } = btn.dataset;
           const campo = box.querySelector(`.valor-cobrado[data-id="${id}"]`);
+          const forma = box.querySelector(`.forma-pag[data-id="${id}"]`)?.value;
           const valor = status === "FINALIZADO" ? campo?.value : null;
           await acaoCard(btn, "Salvando…", () =>
-            Store.donoAtualizarStatus(id, status, valor)
+            Store.donoAtualizarStatus(id, status, valor, status === "FINALIZADO" ? forma : null)
           );
+          if (status === "FINALIZADO") {
+            toast("Atendimento finalizado");
+            painelSecao = "resumo";
+            renderPainel();
+          }
         });
       });
     } catch (e) {
       box.innerHTML = `<p class="lista-vazia erro">${e.message || "Erro ao carregar"}</p>`;
     }
+  }
+
+  function formaRotulo(f) {
+    return (
+      {
+        PIX: "Pix",
+        DINHEIRO: "Dinheiro",
+        CARTAO: "Cartão",
+        OUTRO: "Outro",
+      }[f] || f
+    );
   }
 
   async function acaoCard(btn, textoCarregando, fn) {
@@ -1408,18 +1471,27 @@
     const valor = ag.valorCobrado != null ? ag.valorCobrado : ag.servicoPreco;
     const aberto = ag.status === "CONFIRMADO";
     const emAberto = aberto && jaPassou(ag);
+    const formaAtual = ag.formaPagamento || "PIX";
 
     const fechamento = aberto
       ? `<div class="fechamento ${emAberto ? "urgente" : ""}">
-          <label>Valor
+          <label>Valor pago
             <input type="number" class="valor-cobrado" data-id="${ag.id}"
               min="0" step="0.01" value="${valor ?? ""}" />
+          </label>
+          <label>Forma
+            <select class="forma-pag" data-id="${ag.id}">
+              <option value="PIX" ${formaAtual === "PIX" ? "selected" : ""}>Pix</option>
+              <option value="DINHEIRO" ${formaAtual === "DINHEIRO" ? "selected" : ""}>Dinheiro</option>
+              <option value="CARTAO" ${formaAtual === "CARTAO" ? "selected" : ""}>Cartão</option>
+              <option value="OUTRO" ${formaAtual === "OUTRO" ? "selected" : ""}>Outro</option>
+            </select>
           </label>
           <button type="button" class="btn-status ok" data-id="${ag.id}" data-status="FINALIZADO">✓ Finalizar</button>
           <button type="button" class="btn-status falta" data-id="${ag.id}" data-status="NAO_COMPARECEU">✗ Não veio</button>
         </div>`
       : `<div class="fechamento">
-          <span class="valor-final">${brl(valor)}</span>
+          <span class="valor-final">${brl(valor)}${ag.formaPagamento ? " · " + formaRotulo(ag.formaPagamento) : ""}</span>
           <button type="button" class="btn-status reabrir" data-id="${ag.id}" data-status="CONFIRMADO">Reabrir</button>
         </div>`;
 
@@ -2040,20 +2112,101 @@
     atualizarBarraSalvarBloqueios();
   }
 
-  /* ---------- assinatura ---------- */
+  /* ---------- assinatura / planos ---------- */
 
-  async function iniciarCheckoutAssinatura() {
+  async function renderPainelPlanos() {
+    const box = $("#painel-conteudo");
+    box.innerHTML = `<p class="carregando-slots">Carregando planos…</p>`;
     try {
-      toast("Abrindo checkout…");
-      const res = await Store.donoCheckoutAssinatura();
+      const [status, catalogo] = await Promise.all([
+        Store.donoAssinaturaStatus().catch(() => null),
+        Store.donoAssinaturaCatalogo(),
+      ]);
+      const faixas = agruparCatalogoPorFaixa(catalogo || []);
+      const st = status || {};
+      box.innerHTML = `
+        <div class="planos-status">
+          <strong>${st.planoRotulo || "Trial"}</strong>
+          <span class="badge-status ${st.ativa ? "finalizado" : "confirmado"}">${st.ativa ? "Ativo" : st.status || "Trial"}</span>
+          <p>Até <b>${st.maxBarbeiros ?? 2}</b> barbeiro(s) · ${st.expiraEmTexto ? "válido até " + st.expiraEmTexto : (st.checkoutWeb ? "assine para continuar após o trial" : "checkout em configuração")}</p>
+        </div>
+        <div class="planos-lista">
+          ${faixas
+            .map(
+              (f) => `
+            <article class="plano-faixa">
+              <header>
+                <h3>${f.equipe}</h3>
+                <span>até ${f.maxBarbeiros} profissionais</span>
+              </header>
+              <div class="plano-periodos">
+                ${f.itens
+                  .map(
+                    (p) => `
+                  <button type="button" class="btn-plano" data-plano-id="${p.id}">
+                    <strong>${periodoRotulo(p.periodo)}</strong>
+                    <span>${p.preco}</span>
+                    <small>${p.dica || ""}</small>
+                  </button>`
+                  )
+                  .join("")}
+              </div>
+            </article>`
+            )
+            .join("")}
+        </div>
+        ${!st.checkoutWeb ? `<p class="lista-vazia">Pagamento web ainda não ligado (faltam as chaves do Mercado Pago).</p>` : ""}`;
+
+      $$(".btn-plano", box).forEach((btn) => {
+        btn.addEventListener("click", () => iniciarCheckoutAssinatura(btn.dataset.planoId, btn));
+      });
+    } catch (e) {
+      box.innerHTML = `<p class="lista-vazia erro">${e.message || "Erro ao carregar planos"}</p>`;
+    }
+  }
+
+  function agruparCatalogoPorFaixa(lista) {
+    const map = new Map();
+    for (const p of lista) {
+      const key = p.faixa || p.equipe;
+      if (!map.has(key)) {
+        map.set(key, { equipe: p.equipe, maxBarbeiros: p.maxBarbeiros, itens: [] });
+      }
+      map.get(key).itens.push(p);
+    }
+    return [...map.values()];
+  }
+
+  function periodoRotulo(p) {
+    if (p === "M") return "Mensal";
+    if (p === "S") return "Semestral (−15%)";
+    if (p === "A") return "Anual (−30%)";
+    return p || "Plano";
+  }
+
+  async function iniciarCheckoutAssinatura(planoId, btn) {
+    const id = planoId || "p_1_2_m";
+    const original = btn?.textContent;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Abrindo…";
+    }
+    try {
+      toast("Abrindo checkout Mercado Pago…");
+      const res = await Store.donoCheckoutAssinatura(id);
       const url = res.initPoint || res.init_point || res.sandboxInitPoint;
       if (!url) {
-        toast("Checkout indisponível no momento");
+        toast(res.message || "Checkout indisponível no momento");
         return;
       }
-      window.open(url, "_blank", "noopener");
+      window.location.href = url;
     } catch (e) {
       toast(e.message || "Erro ao iniciar assinatura");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        if (original) btn.innerHTML = original;
+      }
     }
   }
 
@@ -2143,8 +2296,8 @@
   /* ---------- boot ---------- */
 
   function bind() {
-    $("#btn-entry-entrar")?.addEventListener("click", () => {
-      setHash("/login");
+    $("#btn-entry-dono")?.addEventListener("click", () => {
+      mostrarLogin({ intent: "dono" });
     });
     $("#btn-entry-criar")?.addEventListener("click", () => {
       setHash("/criar-loja");
@@ -2319,7 +2472,11 @@
     });
 
     $("#btn-painel-opcoes")?.addEventListener("click", () => ativarTab("painel"));
-    $("#btn-assinatura")?.addEventListener("click", iniciarCheckoutAssinatura);
+    $("#btn-assinatura")?.addEventListener("click", () => {
+      ativarTab("painel");
+      painelSecao = "planos";
+      renderPainel();
+    });
     $("#btn-relatar")?.addEventListener("click", () => {
       toast("Obrigado! Em breve abriremos o canal de suporte.");
     });

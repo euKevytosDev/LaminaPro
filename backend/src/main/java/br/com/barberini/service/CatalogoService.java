@@ -54,6 +54,12 @@ public class CatalogoService {
 
     public Map<String, Object> criarBarbeiro(BarbeiroRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        long ativos = barbeiros.countByBarbeariaIdAndAtivoTrue(loja.getId());
+        int max = CatalogoPlanos.maxBarbeiros(loja.getPlano());
+        if (ativos >= max) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                    "Limite de " + max + " barbeiro(s) do seu plano. Faça upgrade para adicionar mais.");
+        }
         Barbeiro b = new Barbeiro();
         b.setBarbearia(loja);
         aplicarBarbeiro(b, req);
@@ -64,6 +70,15 @@ public class CatalogoService {
         Barbearia loja = tenant.exigirDonoComLoja();
         Barbeiro b = barbeiros.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro não encontrado"));
+        boolean reativando = !b.isAtivo() && (req.ativo() == null || req.ativo());
+        if (reativando) {
+            long ativos = barbeiros.countByBarbeariaIdAndAtivoTrue(loja.getId());
+            int max = CatalogoPlanos.maxBarbeiros(loja.getPlano());
+            if (ativos >= max) {
+                throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                        "Limite de " + max + " barbeiro(s) do seu plano. Faça upgrade para reativar.");
+            }
+        }
         aplicarBarbeiro(b, req);
         return mapBarbeiro(barbeiros.save(b));
     }
