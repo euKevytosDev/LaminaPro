@@ -17,12 +17,18 @@ import java.util.List;
  * O ddl-auto=update cria a restrição do enum de status (ENUM nativo no H2, CHECK no Postgres)
  * e nunca a atualiza quando novos valores entram. Sem isso, gravar FINALIZADO/NAO_COMPARECEU
  * quebra em bancos que já existiam. Converte a coluna para varchar simples.
- * Também vincula registros órfãos à loja demo no multi-tenant.
+ * <p>
+ * Também cria/backfill de {@code barbearia_id} — o Hibernate não consegue adicionar
+ * NOT NULL em tabelas com linhas existentes, e o seed morre com "column does not exist".
  */
 @Configuration
 public class SchemaFixer {
 
     private static final Logger log = LoggerFactory.getLogger(SchemaFixer.class);
+
+    private static final String[] TABELAS_TENANT = {
+            "barbeiros", "servicos", "bloqueios_horario", "agendamentos"
+    };
 
     @Bean
     @Order(0)
@@ -30,6 +36,7 @@ public class SchemaFixer {
         return args -> {
             removerChecksObsoletos(jdbc);
             converterParaVarchar(jdbc);
+            garantirColunasBarbearia(jdbc);
             vincularOrfaosAoDemo(jdbc);
         };
     }
@@ -77,6 +84,45 @@ public class SchemaFixer {
         }
     }
 
+    /** Hibernate ddl-auto falha ao ADD NOT NULL com dados; criamos nullable → backfill → NOT NULL. */
+    private void garantirColunasBarbearia(JdbcTemplate jdbc) {
+        if (!tabelaExiste(jdbc, "barbearias")) return;
+
+        Long demoId = garantirDemo(jdbc);
+        if (demoId == null) return;
+
+        for (String tabela : TABELAS_TENANT) {
+            if (!tabelaExiste(jdbc, tabela)) continue;
+            try {
+                if (!colunaExiste(jdbc, tabela, "barbearia_id")) {
+                    jdbc.execute("alter table " + tabela + " add column barbearia_id bigint");
+                    log.info("Coluna {}.barbearia_id criada (nullable)", tabela);
+                }
+                int n = jdbc.update(
+                        "update " + tabela + " set barbearia_id = ? where barbearia_id is null",
+                        demoId);
+                if (n > 0) {
+                    log.info("Backfill {} órfãos em {}.barbearia_id → demo {}", n, tabela, demoId);
+                }
+                if (isPostgres(jdbc) && colunaNullable(jdbc, tabela, "barbearia_id")) {
+                    jdbc.execute("alter table " + tabela + " alter column barbearia_id set not null");
+                }
+                garantirFk(jdbc, tabela, "barbearia_id", "fk_" + tabela + "_barbearia");
+            } catch (Exception e) {
+                log.warn("Falha ao garantir barbearia_id em {}: {}", tabela, e.getMessage());
+            }
+        }
+
+        if (tabelaExiste(jdbc, "usuarios") && !colunaExiste(jdbc, "usuarios", "barbearia_id")) {
+            try {
+                jdbc.execute("alter table usuarios add column barbearia_id bigint");
+                log.info("Coluna usuarios.barbearia_id criada");
+            } catch (Exception e) {
+                log.warn("Falha ao criar usuarios.barbearia_id: {}", e.getMessage());
+            }
+        }
+    }
+
     private void vincularOrfaosAoDemo(JdbcTemplate jdbc) {
         try {
             if (!tabelaExiste(jdbc, "barbearias")) return;
@@ -84,10 +130,9 @@ public class SchemaFixer {
             Long demoId = garantirDemo(jdbc);
             if (demoId == null) return;
 
-            atualizarOrfaos(jdbc, "barbeiros", demoId);
-            atualizarOrfaos(jdbc, "servicos", demoId);
-            atualizarOrfaos(jdbc, "bloqueios_horario", demoId);
-            atualizarOrfaos(jdbc, "agendamentos", demoId);
+            for (String tabela : TABELAS_TENANT) {
+                atualizarOrfaos(jdbc, tabela, demoId);
+            }
 
             if (colunaExiste(jdbc, "usuarios", "barbearia_id")) {
                 int n = jdbc.update("""
@@ -133,6 +178,45 @@ public class SchemaFixer {
             if (n > 0) log.info("Vinculados {} registros órfãos de {} à loja demo", n, tabela);
         } catch (Exception e) {
             log.warn("Não foi possível atualizar órfãos em {}: {}", tabela, e.getMessage());
+        }
+    }
+
+    private void garantirFk(JdbcTemplate jdbc, String tabela, String coluna, String nomeFk) {
+        if (!isPostgres(jdbc)) return;
+        try {
+            Integer existe = jdbc.queryForObject("""
+                    select count(*) from pg_constraint
+                    where conname = ? and contype = 'f'
+                    """, Integer.class, nomeFk);
+            if (existe != null && existe > 0) return;
+            jdbc.execute("alter table " + tabela
+                    + " add constraint " + nomeFk
+                    + " foreign key (" + coluna + ") references barbearias(id)");
+            log.info("FK {} criada", nomeFk);
+        } catch (Exception e) {
+            log.warn("Não foi possível criar FK {}: {}", nomeFk, e.getMessage());
+        }
+    }
+
+    private boolean colunaNullable(JdbcTemplate jdbc, String tabela, String coluna) {
+        try {
+            String n = jdbc.queryForObject("""
+                    select is_nullable from information_schema.columns
+                    where lower(table_name) = ? and lower(column_name) = ?
+                    """, String.class, tabela.toLowerCase(), coluna.toLowerCase());
+            return "YES".equalsIgnoreCase(n);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isPostgres(JdbcTemplate jdbc) {
+        try {
+            String banco = jdbc.execute(
+                    (ConnectionCallback<String>) c -> c.getMetaData().getDatabaseProductName());
+            return banco != null && banco.toLowerCase().contains("postgre");
+        } catch (Exception e) {
+            return false;
         }
     }
 
