@@ -6,7 +6,7 @@ window.API = (() => {
     location.hostname === "127.0.0.1" ||
     location.protocol === "file:";
 
-  /** Produção: Northflank (override: localStorage laminapro_api_url ou encaixe_api_url) */
+  /** Produção: Northflank (override: localStorage laminapro_api_url) */
   const API_BASE_PROD = "https://p01--laminapro-api--w5zz78kgqjtj.code.run";
 
   const BASE = isLocal
@@ -16,14 +16,19 @@ window.API = (() => {
       localStorage.getItem("barberini_api_url") ||
       API_BASE_PROD;
 
+  const TOKEN_KEY = "laminapro_token";
+
   function token() {
-    let t = localStorage.getItem("encaixe_token");
+    let t = localStorage.getItem(TOKEN_KEY);
     if (!t) {
-      const legado = localStorage.getItem("barberini_token");
-      if (legado) {
-        localStorage.setItem("encaixe_token", legado);
+      t =
+        localStorage.getItem("encaixe_token") ||
+        localStorage.getItem("barberini_token") ||
+        "";
+      if (t) {
+        localStorage.setItem(TOKEN_KEY, t);
+        localStorage.removeItem("encaixe_token");
         localStorage.removeItem("barberini_token");
-        t = legado;
       }
     }
     return t || "";
@@ -43,7 +48,7 @@ window.API = (() => {
     } catch (e) {
       const msg = isLocal
         ? "Servidor offline. Suba o backend no IntelliJ (porta 8080)."
-        : "API offline (Render free pode estar acordando — aguarde ~30s e tente de novo).";
+        : "API offline. Aguarde alguns segundos e tente de novo.";
       const err = new Error(msg);
       err.offline = true;
       throw err;
@@ -74,9 +79,11 @@ window.API = (() => {
     del: (path) => request(path, { method: "DELETE" }),
     setToken(t) {
       if (t) {
-        localStorage.setItem("encaixe_token", t);
+        localStorage.setItem(TOKEN_KEY, t);
+        localStorage.removeItem("encaixe_token");
         localStorage.removeItem("barberini_token");
       } else {
+        localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem("encaixe_token");
         localStorage.removeItem("barberini_token");
       }

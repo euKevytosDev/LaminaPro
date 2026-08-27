@@ -1,9 +1,12 @@
-/* Encaixe — app web multi-tenant, mobile-first, sync na confirmação */
+/* Lâmina Pro — app web multi-tenant, mobile-first, sync na confirmação */
 
 (() => {
   const U = () => window.ENCAIXE.utils;
   const B = () => window.ENCAIXE;
   const P = () => window.ENCAIXE.produto;
+  const BRAND_MARK = (size = 72) =>
+    `<img src="assets/laminapro-mark.png" alt="" width="${size}" height="${size}" />`;
+  const BRAND_MARK_MINI = BRAND_MARK(36);
 
   const booking = {
     path: null,
@@ -83,22 +86,25 @@
 
   function letraMarca() {
     const n = nomeLojaDisplay();
-    return (n && n[0]) || "E";
+    return (n && n[0]) || "L";
   }
 
   function atualizarMarcasUI() {
     const nome = nomeLojaDisplay();
     const letra = letraMarca();
     const header = $("#header-marca");
-    if (header) header.textContent = rotaAtual.tipo === "dono" ? "ENCAIXE" : nome;
+    if (header) header.textContent = rotaAtual.tipo === "dono" ? P().nomeCurto : nome;
     const mini = $("#logo-mini");
     if (mini) {
       const loja = Store.getLoja();
       if (loja?.logoData && rotaAtual.tipo !== "dono") {
         mini.innerHTML = `<img src="${loja.logoData}" alt="" />`;
         mini.classList.add("com-logo");
+      } else if (rotaAtual.tipo === "dono") {
+        mini.innerHTML = BRAND_MARK_MINI;
+        mini.classList.add("com-logo", "brand-mark-mini");
       } else {
-        mini.textContent = rotaAtual.tipo === "dono" ? "E" : letra;
+        mini.textContent = letra;
         mini.classList.remove("com-logo");
       }
     }
@@ -225,11 +231,22 @@
     if (rotaAtual.slug && loja?.nome) {
       if (titulo) titulo.textContent = loja.nome.toUpperCase();
       if (sub) sub.textContent = "Agende seu horário";
-      if (letra) letra.textContent = (loja.nome[0] || "E").toUpperCase();
+      if (letra) {
+        if (loja.logoData) {
+          letra.className = "brand-mark brand-mark-lg";
+          letra.innerHTML = `<img src="${loja.logoData}" alt="" width="72" height="72" />`;
+        } else {
+          letra.className = "login-b";
+          letra.textContent = (loja.nome[0] || "L").toUpperCase();
+        }
+      }
     } else {
-      if (titulo) titulo.textContent = "ENCAIXE";
+      if (titulo) titulo.textContent = P().nomeCurto;
       if (sub) sub.textContent = P().tagline;
-      if (letra) letra.textContent = "E";
+      if (letra) {
+        letra.className = "brand-mark brand-mark-lg";
+        letra.innerHTML = BRAND_MARK(72);
+      }
     }
     initGoogleSignIn();
   }
@@ -439,9 +456,9 @@
       lembreteIds.add(String(ag.id));
       const tid = setTimeout(() => {
         try {
-          new Notification("Lembrete Encaixe", {
+          new Notification("Lembrete Lâmina Pro", {
             body: `${ag.servicoNome || "Agendamento"} às ${String(ag.hora).substring(0, 5)}`,
-            tag: `encaixe-${ag.id}`,
+            tag: `laminapro-${ag.id}`,
           });
         } catch {
           /* ignore */
@@ -1141,7 +1158,7 @@
         <label>Até<input type="date" id="resumo-ate" value="${fim}" /></label>
         <button type="button" id="btn-resumo-aplicar">Aplicar</button>
       </div>
-      <button type="button" class="btn-assinatura-painel" id="btn-assinatura-resumo">✦ Assinar Encaixe Solo R$ 49,90</button>
+      <button type="button" class="btn-assinatura-painel" id="btn-assinatura-resumo">✦ Assinar Lâmina Pro Solo R$ 49,90</button>
       <div id="resumo-dados"><p class="carregando-slots">Carregando…</p></div>`;
 
     $$(".chip-periodo", box).forEach((b) => {
@@ -1415,7 +1432,7 @@
         <p>${ag.servicoNome} — ${ag.barbeiroNome}</p>
         <div class="tags-ag">
           <span class="badge-status ${ag.status.toLowerCase()}">${STATUS_ROTULO[ag.status] || ag.status}</span>
-          ${ag.semPreferencia ? `<span class="tag-sem-pref">Encaixe · sem preferência</span>` : ""}
+          ${ag.semPreferencia ? `<span class="tag-sem-pref">Sem preferência</span>` : ""}
           ${emAberto ? `<span class="tag-pendente">Aguardando fechamento</span>` : ""}
         </div>
         ${ag.observacao ? `<small>Obs: ${ag.observacao}</small>` : ""}
@@ -1664,7 +1681,7 @@
 
   function draftKeyBloqueios() {
     const dataIso = U().toISODate(bloqueioDataSel);
-    return `encaixe_bl_${Store.getSlug()}_${bloqueioBarbeiroId}_${dataIso}`;
+    return `laminapro_bl_${Store.getSlug()}_${bloqueioBarbeiroId}_${dataIso}`;
   }
 
   function salvarDraftBloqueiosLocal() {

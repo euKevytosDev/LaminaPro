@@ -1,14 +1,15 @@
-/* Encaixe — produto, regras de agenda e utilitários */
+/* Lâmina Pro — produto, regras de agenda e utilitários */
 
 window.ENCAIXE = {
   produto: {
-    nome: "Encaixe",
-    tagline: "Agenda que encaixa",
+    nome: "Lâmina Pro",
+    nomeCurto: "LÂMINA PRO",
+    tagline: "Agenda para barbearias",
   },
 
   /** Preenchido dinamicamente pela loja (API) */
-  estabelecimento: "ENCAIXE",
-  nomeCompleto: "Encaixe",
+  estabelecimento: "LÂMINA PRO",
+  nomeCompleto: "Lâmina Pro",
   timezone: "America/Sao_Paulo",
 
   /** Cancelamento com menos de 1h: taxa 50% + bloqueio até pagar */
@@ -154,5 +155,6 @@ window.ENCAIXE.utils = {
   },
 };
 
-/** Alias legado — código antigo que ainda referencia BARBERINI */
+/** Alias legado — código antigo que ainda referencia BARBERINI / ENCAIXE */
+window.LAMINAPRO = window.ENCAIXE;
 window.BARBERINI = window.ENCAIXE;

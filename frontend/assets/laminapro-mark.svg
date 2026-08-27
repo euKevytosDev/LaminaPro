@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Lâmina Pro">
+  <rect width="128" height="128" rx="28" fill="#111"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- lâmina -->
+    <path d="M34 78 L78 34 L92 48 L48 92 Z" fill="#C8CDD4" stroke="#A8AEB8" stroke-width="1.5"/>
+    <!-- fio dourado -->
+    <path d="M40 76 L76 40" stroke="#C4A574" stroke-width="2.5"/>
+    <!-- cabo -->
+    <path d="M48 92 C58 102 78 104 96 88 C102 82 100 74 92 70 L78 84" fill="#B8BEC6" stroke="#9AA0A8" stroke-width="1.5"/>
+    <!-- pivô -->
+    <circle cx="78" cy="84" r="4.5" fill="#8A9098"/>
+    <circle cx="78" cy="84" r="2" fill="#D0D4DA"/>
+  </g>
+</svg>

@@ -5,20 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#1a1a1a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Encaixe" />
-  <meta name="description" content="Encaixe — agenda que encaixa. SaaS de agendamento para barbearias." />
-  <title>Encaixe</title>
+  <meta name="apple-mobile-web-app-title" content="Lâmina Pro" />
+  <meta name="description" content="Lâmina Pro — agenda profissional para barbearias." />
+  <title>Lâmina Pro</title>
+  <link rel="icon" type="image/png" href="assets/laminapro-icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/laminapro-icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/estilo.css" />
 </head>
 <body>
-  <div id="splash" class="splash" role="status" aria-label="Carregando Encaixe">
+  <div id="splash" class="splash" role="status" aria-label="Carregando Lâmina Pro">
     <div class="splash-conteudo">
-      <div class="login-b" style="margin:0 auto 18px;border-color:#fff;color:#fff">E</div>
-      <p class="splash-logo">ENCAIXE</p>
-      <p class="splash-sub">Agenda que encaixa</p>
+      <div class="brand-mark brand-mark-lg" aria-hidden="true">
+        <img src="assets/laminapro-mark.png" alt="" width="96" height="96" />
+      </div>
+      <p class="splash-logo">LÂMINA PRO</p>
+      <p class="splash-sub">Agenda para barbearias</p>
       <div class="splash-barra" aria-hidden="true"><div class="splash-barra-fill"></div></div>
     </div>
   </div>
@@ -27,9 +31,11 @@
     <!-- ENTRY / GATE -->
     <section id="tela-entry" class="tela-entry oculto">
       <div class="entry-marca">
-        <div class="login-b">E</div>
-        <h1 class="login-titulo">ENCAIXE</h1>
-        <p class="login-subtitulo">Agenda que encaixa</p>
+        <div class="brand-mark brand-mark-lg" aria-hidden="true">
+          <img src="assets/laminapro-mark.png" alt="" width="72" height="72" />
+        </div>
+        <h1 class="login-titulo">LÂMINA PRO</h1>
+        <p class="login-subtitulo">Agenda para barbearias</p>
       </div>
       <div class="entry-acoes">
         <button type="button" class="btn-login-principal" id="btn-entry-entrar">Entrar na minha loja</button>
@@ -53,7 +59,7 @@
         <button type="button" class="btn-voltar-entry" id="btn-criar-voltar" aria-label="Voltar">←</button>
         <div>
           <h1>Criar minha barbearia</h1>
-          <p>Monte sua loja no Encaixe em menos de 2 minutos</p>
+          <p>Monte sua loja no Lâmina Pro em menos de 2 minutos</p>
         </div>
       </div>
       <form id="form-criar-loja" class="login-acoes criar-loja-form">
@@ -93,9 +99,11 @@
         <span>BR</span>
       </div>
       <div class="login-marca">
-        <div class="login-b" id="login-logo-letra">E</div>
-        <h1 class="login-titulo" id="login-marca-titulo">ENCAIXE</h1>
-        <p class="login-subtitulo" id="login-marca-sub">Agenda que encaixa</p>
+        <div class="brand-mark brand-mark-lg" id="login-logo-letra" aria-hidden="true">
+          <img src="assets/laminapro-mark.png" alt="" width="72" height="72" />
+        </div>
+        <h1 class="login-titulo" id="login-marca-titulo">LÂMINA PRO</h1>
+        <p class="login-subtitulo" id="login-marca-sub">Agenda para barbearias</p>
       </div>
 
       <h2 id="auth-titulo" class="auth-titulo">Entrar</h2>
@@ -147,14 +155,16 @@
       <header class="app-header">
         <button type="button" class="ico" aria-label="Informações">ⓘ</button>
         <div class="app-header-centro">
-          <strong id="header-marca">ENCAIXE</strong>
+          <strong id="header-marca">LÂMINA PRO</strong>
           <span id="header-user">Cliente</span>
         </div>
         <button type="button" class="ico" aria-label="Notificações">🔔</button>
       </header>
 
       <div class="sub-header">
-        <div class="logo-mini" id="logo-mini">E</div>
+        <div class="logo-mini brand-mark-mini" id="logo-mini">
+          <img src="assets/laminapro-mark.png" alt="" width="36" height="36" />
+        </div>
         <h2 id="titulo-aba">Agenda</h2>
       </div>
 
@@ -162,7 +172,7 @@
       <div class="aba-conteudo ativa" id="aba-agenda">
         <div id="agenda-vazia" class="agenda-vazia">
           <div class="aviso-ico">!</div>
-          <p>Você não tem compromissos para os próximos 30 dias.<br /><strong id="agenda-vazia-marca">ENCAIXE</strong></p>
+          <p>Você não tem compromissos para os próximos 30 dias.<br /><strong id="agenda-vazia-marca">Lâmina Pro</strong></p>
         </div>
         <div id="lista-agenda"></div>
       </div>
@@ -185,7 +195,7 @@
       <div class="aba-conteudo" id="aba-opcoes">
         <div class="opcoes-lista">
           <button type="button" class="opcao-item oculto" id="btn-painel-opcoes">📊 Painel do dono</button>
-          <button type="button" class="opcao-item oculto" id="btn-assinatura">✦ Assinar Encaixe Solo R$ 49,90</button>
+          <button type="button" class="opcao-item oculto" id="btn-assinatura">✦ Assinar Lâmina Pro Solo R$ 49,90</button>
           <button type="button" class="opcao-item" id="btn-relatar">🐛 Relatar um problema</button>
           <button type="button" class="opcao-item perigo" id="btn-sair">↩ Sair</button>
         </div>
@@ -232,7 +242,7 @@
           <header class="wizard-header">
             <div>
               <h2>Como deseja agendar?</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -256,7 +266,7 @@
           <header class="wizard-header">
             <div>
               <h2>Escolher Profissional</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -271,7 +281,7 @@
           <header class="wizard-header">
             <div>
               <h2>Escolher Serviços</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -299,7 +309,7 @@
           <header class="wizard-header">
             <div>
               <h2>Data e Horário</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -336,7 +346,7 @@
           <header class="wizard-header">
             <div>
               <h2>Criar Agendamento</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -351,7 +361,7 @@
               </div>
               <div>
                 <small>Estabelecimento</small>
-                <strong id="conf-estab">ENCAIXE</strong>
+                <strong id="conf-estab">LÂMINA PRO</strong>
               </div>
             </div>
             <p class="conf-dica">Confira os serviços e horários escolhidos e confirme para finalizar o agendamento</p>
@@ -378,7 +388,7 @@
           <header class="wizard-header">
             <div>
               <h2 id="succ-titulo">Agendamento confirmado!</h2>
-              <p class="marca-dinamica">ENCAIXE</p>
+              <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>

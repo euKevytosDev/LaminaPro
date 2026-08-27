@@ -1,9 +1,26 @@
 /* Persistência local (por slug) + cache de catálogo + rascunho + APIs do dono */
 
 window.Store = (() => {
-  const KEY_SLUG = "encaixe_slug";
-  const KEY_USER = "encaixe_user";
-  const KEY_LOJA = "encaixe_loja_meta";
+  const KEY_SLUG = "laminapro_slug";
+  const KEY_USER = "laminapro_user";
+  const KEY_LOJA = "laminapro_loja_meta";
+
+  /** Migra chaves antigas Encaixe/Barberini → Lâmina Pro (uma vez) */
+  (function migrarKeys() {
+    const pares = [
+      ["encaixe_slug", KEY_SLUG],
+      ["barberini_slug", KEY_SLUG],
+      ["encaixe_user", KEY_USER],
+      ["barberini_user", KEY_USER],
+      ["encaixe_loja_meta", KEY_LOJA],
+      ["barberini_loja_meta", KEY_LOJA],
+    ];
+    for (const [de, para] of pares) {
+      if (!localStorage.getItem(para) && localStorage.getItem(de)) {
+        localStorage.setItem(para, localStorage.getItem(de));
+      }
+    }
+  })();
 
   let currentSlug = localStorage.getItem(KEY_SLUG) || "";
   let lojaMeta = null;
@@ -16,16 +33,16 @@ window.Store = (() => {
 
   function keyState() {
     const s = currentSlug || "_app";
-    return `encaixe_${s}_v1`;
+    return `laminapro_${s}_v1`;
   }
   function keyDraft() {
-    return `encaixe_${currentSlug || "_app"}_draft`;
+    return `laminapro_${currentSlug || "_app"}_draft`;
   }
   function keyCatalog() {
-    return `encaixe_${currentSlug || "_app"}_catalog`;
+    return `laminapro_${currentSlug || "_app"}_catalog`;
   }
   function keySlots() {
-    return `encaixe_${currentSlug || "_app"}_slots`;
+    return `laminapro_${currentSlug || "_app"}_slots`;
   }
 
   const padrao = () => ({
@@ -95,8 +112,8 @@ window.Store = (() => {
     localStorage.setItem(KEY_LOJA, JSON.stringify(lojaMeta));
     const E = window.ENCAIXE;
     if (E) {
-      E.estabelecimento = (loja.nome || "Encaixe").toUpperCase();
-      E.nomeCompleto = loja.nome || "Encaixe";
+      E.estabelecimento = (loja.nome || "Lâmina Pro").toUpperCase();
+      E.nomeCompleto = loja.nome || "Lâmina Pro";
     }
   }
 
@@ -300,8 +317,8 @@ window.Store = (() => {
       localStorage.removeItem(KEY_LOJA);
       const E = window.ENCAIXE;
       if (E) {
-        E.estabelecimento = "ENCAIXE";
-        E.nomeCompleto = "Encaixe";
+        E.estabelecimento = "LÂMINA PRO";
+        E.nomeCompleto = "Lâmina Pro";
       }
     },
 
