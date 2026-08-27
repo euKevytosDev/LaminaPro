@@ -15,7 +15,7 @@ public enum PlanoBarbearia {
             case TRIAL, SOLO, P_1_2 -> 2;
             case P_3_5 -> 5;
             case P_6_15 -> 15;
-            case P_16_PLUS -> 999;
+            case P_16_PLUS -> 20;
         };
     }
 
@@ -29,7 +29,7 @@ public enum PlanoBarbearia {
             case P_1_2 -> "1 a 2 profissionais";
             case P_3_5 -> "3 a 5 profissionais";
             case P_6_15 -> "6 a 15 profissionais";
-            case P_16_PLUS -> "Mais de 15 profissionais";
+            case P_16_PLUS -> "16 a 20 profissionais";
             default -> name();
         };
     }

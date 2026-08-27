@@ -442,11 +442,13 @@ body {
 }
 
 .btn-fab-agendar {
-  position: absolute;
+  position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--nav-h) + 14px + var(--safe-bottom));
-  z-index: 30;
+  z-index: 45;
+  width: auto;
+  max-width: calc(430px - 48px);
   border: none;
   background: var(--preto);
   color: #fff;
@@ -459,18 +461,23 @@ body {
   box-shadow: 0 8px 24px rgba(0,0,0,0.25);
 }
 
-/* bottom nav */
+/* bottom nav — fixa no mobile */
 .bottom-nav {
-  position: absolute;
-  left: 0;
-  right: 0;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 0;
+  width: 100%;
+  max-width: 430px;
   height: calc(var(--nav-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: #dcdcdc;
+  background: rgba(245, 245, 245, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
-  border-top: 1px solid rgba(0,0,0,0.06);
-  z-index: 20;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  z-index: 40;
+  box-shadow: 0 -6px 20px rgba(0,0,0,0.06);
 }
 .tab {
   flex: 1;
@@ -480,21 +487,36 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   font: inherit;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: var(--cinza-escuro);
+  color: #6b6b6b;
   cursor: pointer;
   text-transform: uppercase;
+  min-height: var(--nav-h);
+  transition: color 0.15s ease, background 0.15s ease;
 }
 .tab.ativa {
-  background: rgba(0,0,0,0.08);
+  color: #111;
+  background: transparent;
+}
+.tab.ativa .tab-ico {
+  color: #111;
 }
 .tab .tab-ico {
-  font-size: 1.2rem;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: inherit;
   line-height: 1;
+}
+.tab .tab-ico svg {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 /* perfil */
@@ -2022,6 +2044,9 @@ body {
 
   .bottom-nav {
     position: static;
+    transform: none;
+    left: auto;
+    max-width: none;
     grid-column: 1;
     grid-row: 2 / 4;
     flex-direction: column;
@@ -2034,6 +2059,8 @@ body {
     border-right: 1px solid var(--linha);
     border-radius: 0;
     overflow-y: auto;
+    box-shadow: none;
+    backdrop-filter: none;
   }
 
   .tab {
@@ -2083,6 +2110,7 @@ body {
   }
 
   .btn-fab-agendar {
+    position: absolute;
     left: auto;
     right: 32px;
     bottom: 32px;
@@ -2644,7 +2672,36 @@ body {
   }
 }
 
-/* ---------- planos / fechamento ---------- */
+.paywall-dono {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  font-size: 0.82rem;
+  z-index: 35;
+  flex-shrink: 0;
+}
+.paywall-dono.oculto { display: none !important; }
+.paywall-dono strong { font-size: 0.88rem; }
+.paywall-dono span { opacity: 0.85; flex: 1; min-width: 160px; }
+.paywall-dono button {
+  border: none;
+  background: #c4a574;
+  color: #111;
+  font: inherit;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.paywall-inline {
+  margin: 8px 0 0 !important;
+  color: #b00020 !important;
+  font-weight: 600;
+}
 .planos-status {
   background: #fff;
   border-radius: 12px;

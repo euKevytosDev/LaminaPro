@@ -58,14 +58,29 @@ public class AssinaturaService {
         m.put("periodo", loja.getPlanoPeriodo() != null ? loja.getPlanoPeriodo() : "");
         m.put("status", loja.getStatusAssinatura() != null ? loja.getStatusAssinatura().name() : "TRIAL");
         m.put("ativa", ativa);
+        m.put("bloqueada", !ativa);
         m.put("maxBarbeiros", CatalogoPlanos.maxBarbeiros(loja.getPlano()));
         m.put("checkoutWeb", mercadoPago.configurado());
         m.put("trialDias", trialDias);
+        LocalDateTime trialFim = null;
+        if (loja.getStatusAssinatura() == StatusAssinatura.TRIAL) {
+            LocalDateTime base = loja.getCriadoEm() != null ? loja.getCriadoEm() : LocalDateTime.now();
+            trialFim = base.plusDays(trialDias);
+        }
+        m.put("trialExpiraEm", trialFim != null ? trialFim.toString() : "");
+        m.put("trialExpiraEmTexto", trialFim != null ? FMT.format(trialFim) : "");
         LocalDateTime exp = loja.getPlanoExpiraEm();
         m.put("expiraEm", exp != null ? exp.toString() : "");
         m.put("expiraEmTexto", exp != null ? FMT.format(exp) : "");
         m.put("origem", loja.getPagamentoOrigem() != null ? loja.getPagamentoOrigem() : "");
         return m;
+    }
+
+    /** Após o trial, só libera recursos com assinatura ativa (pagamento). */
+    public void exigirAssinaturaAtiva(Barbearia loja) {
+        if (assinaturaAtiva(loja)) return;
+        throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                "Seu período de teste acabou. Assine um plano para continuar usando o Lâmina Pro.");
     }
 
     public boolean assinaturaAtiva(Barbearia loja) {

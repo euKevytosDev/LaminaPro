@@ -33,6 +33,7 @@ public class AgendamentoService {
     private final UsuarioRepository usuarios;
     private final AgendaService agenda;
     private final TenantSupport tenant;
+    private final AssinaturaService assinatura;
 
     public AgendamentoService(
             AgendamentoRepository agendamentos,
@@ -41,7 +42,8 @@ public class AgendamentoService {
             ServicoRepository servicos,
             UsuarioRepository usuarios,
             AgendaService agenda,
-            TenantSupport tenant) {
+            TenantSupport tenant,
+            AssinaturaService assinatura) {
         this.agendamentos = agendamentos;
         this.barbearias = barbearias;
         this.barbeiros = barbeiros;
@@ -49,6 +51,7 @@ public class AgendamentoService {
         this.usuarios = usuarios;
         this.agenda = agenda;
         this.tenant = tenant;
+        this.assinatura = assinatura;
     }
 
     @Transactional
@@ -60,6 +63,7 @@ public class AgendamentoService {
         Barbearia loja = barbearias.findBySlugIgnoreCase(req.slug().trim())
                 .filter(Barbearia::isAtivo)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
+        assinatura.exigirAssinaturaAtiva(loja);
 
         Servico servico = servicos.findByIdAndBarbeariaId(req.servicoId(), loja.getId())
                 .filter(Servico::isAtivo)
@@ -114,6 +118,7 @@ public class AgendamentoService {
     @Transactional
     public Map<String, Object> reatribuirBarbeiro(Long id, Long novoBarbeiroId) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         Agendamento a = agendamentos.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento não encontrado"));
         if (a.getStatus() == StatusAgendamento.CANCELADO) {
@@ -172,6 +177,7 @@ public class AgendamentoService {
             BigDecimal valorCobrado,
             FormaPagamento formaPagamento) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         if (novoStatus == StatusAgendamento.CANCELADO) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use o cancelamento para cancelar");
         }

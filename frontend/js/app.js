@@ -319,9 +319,23 @@
       }
     }
 
+    let tabInicial = tab || (modoFinal === "dono" ? "painel" : "agenda");
+    if (modoFinal === "dono") {
+      try {
+        const st = await Store.donoAssinaturaStatus();
+        aplicarPaywallDono(st);
+        if (st && st.bloqueada) {
+          painelSecao = "planos";
+          tabInicial = "painel";
+        }
+      } catch {
+        esconderPaywallDono();
+      }
+    } else {
+      esconderPaywallDono();
+    }
+
     renderAgenda();
-    const tabInicial =
-      tab || (modoFinal === "dono" ? "painel" : "agenda");
     ativarTab(tabInicial);
   }
 
@@ -408,6 +422,38 @@
 
   function irParaLogin() {
     setHash("/login");
+  }
+
+  function aplicarPaywallDono(st) {
+    let bar = $("#paywall-dono");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "paywall-dono";
+      bar.className = "paywall-dono oculto";
+      $("#tela-app")?.prepend(bar);
+    }
+    if (!st || !st.bloqueada) {
+      bar.classList.add("oculto");
+      bar.innerHTML = "";
+      return;
+    }
+    bar.classList.remove("oculto");
+    bar.innerHTML = `
+      <strong>Trial encerrado</strong>
+      <span>Assine um plano para liberar o painel, agenda e novos agendamentos.</span>
+      <button type="button" id="btn-paywall-planos">Ver planos</button>`;
+    $("#btn-paywall-planos", bar)?.addEventListener("click", () => {
+      painelSecao = "planos";
+      ativarTab("painel");
+    });
+  }
+
+  function esconderPaywallDono() {
+    const bar = $("#paywall-dono");
+    if (bar) {
+      bar.classList.add("oculto");
+      bar.innerHTML = "";
+    }
   }
 
   function atualizarHeaderUsuario() {
@@ -2127,8 +2173,17 @@
       box.innerHTML = `
         <div class="planos-status">
           <strong>${st.planoRotulo || "Trial"}</strong>
-          <span class="badge-status ${st.ativa ? "finalizado" : "confirmado"}">${st.ativa ? "Ativo" : st.status || "Trial"}</span>
-          <p>Até <b>${st.maxBarbeiros ?? 2}</b> barbeiro(s) · ${st.expiraEmTexto ? "válido até " + st.expiraEmTexto : (st.checkoutWeb ? "assine para continuar após o trial" : "checkout em configuração")}</p>
+          <span class="badge-status ${st.ativa ? "finalizado" : "confirmado"}">${st.bloqueada ? "Bloqueado" : st.ativa ? "Ativo" : st.status || "Trial"}</span>
+          <p>Até <b>${st.maxBarbeiros ?? 2}</b> barbeiro(s)${
+            st.bloqueada
+              ? " · assine para liberar os recursos"
+              : st.trialExpiraEmTexto
+                ? " · trial até " + st.trialExpiraEmTexto
+                : st.expiraEmTexto
+                  ? " · válido até " + st.expiraEmTexto
+                  : ""
+          }</p>
+          ${st.bloqueada ? `<p class="paywall-inline">Seu teste acabou. Escolha um plano abaixo para continuar.</p>` : ""}
         </div>
         <div class="planos-lista">
           ${faixas

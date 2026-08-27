@@ -28,16 +28,19 @@ public class CatalogoService {
     private final ServicoRepository servicos;
     private final BloqueioHorarioRepository bloqueios;
     private final TenantSupport tenant;
+    private final AssinaturaService assinatura;
 
     public CatalogoService(
             BarbeiroRepository barbeiros,
             ServicoRepository servicos,
             BloqueioHorarioRepository bloqueios,
-            TenantSupport tenant) {
+            TenantSupport tenant,
+            AssinaturaService assinatura) {
         this.barbeiros = barbeiros;
         this.servicos = servicos;
         this.bloqueios = bloqueios;
         this.tenant = tenant;
+        this.assinatura = assinatura;
     }
 
     public List<Map<String, Object>> listarBarbeiros(boolean soAtivos) {
@@ -54,6 +57,7 @@ public class CatalogoService {
 
     public Map<String, Object> criarBarbeiro(BarbeiroRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         long ativos = barbeiros.countByBarbeariaIdAndAtivoTrue(loja.getId());
         int max = CatalogoPlanos.maxBarbeiros(loja.getPlano());
         if (ativos >= max) {
@@ -68,6 +72,7 @@ public class CatalogoService {
 
     public Map<String, Object> atualizarBarbeiro(Long id, BarbeiroRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         Barbeiro b = barbeiros.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro não encontrado"));
         boolean reativando = !b.isAtivo() && (req.ativo() == null || req.ativo());
@@ -97,6 +102,7 @@ public class CatalogoService {
 
     public Map<String, Object> criarServico(ServicoRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         Servico s = new Servico();
         s.setBarbearia(loja);
         aplicarServico(s, req);
@@ -105,6 +111,7 @@ public class CatalogoService {
 
     public Map<String, Object> atualizarServico(Long id, ServicoRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         Servico s = servicos.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado"));
         aplicarServico(s, req);
@@ -114,6 +121,7 @@ public class CatalogoService {
     @Transactional
     public Map<String, Object> criarBloqueio(BloqueioRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         BloqueioHorario b = new BloqueioHorario();
         b.setBarbearia(loja);
         b.setData(req.data());
@@ -129,6 +137,7 @@ public class CatalogoService {
 
     public void removerBloqueio(Long id) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         BloqueioHorario b = bloqueios.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bloqueio não encontrado"));
         bloqueios.delete(b);
@@ -148,6 +157,7 @@ public class CatalogoService {
     @Transactional
     public List<Map<String, Object>> syncBloqueios(SyncBloqueiosRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         Long lojaId = loja.getId();
 
         if (req.removerIds() != null) {

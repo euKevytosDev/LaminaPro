@@ -11,6 +11,7 @@ import br.com.barberini.model.Barbearia;
 import br.com.barberini.repository.BarbeariaRepository;
 import br.com.barberini.security.TenantSupport;
 import br.com.barberini.service.AgendamentoService;
+import br.com.barberini.service.AssinaturaService;
 import br.com.barberini.service.CatalogoService;
 import br.com.barberini.service.ResumoService;
 import jakarta.validation.Valid;
@@ -32,18 +33,21 @@ public class DonoController {
     private final ResumoService resumos;
     private final TenantSupport tenant;
     private final BarbeariaRepository barbearias;
+    private final AssinaturaService assinatura;
 
     public DonoController(
             CatalogoService catalogo,
             AgendamentoService agendamentos,
             ResumoService resumos,
             TenantSupport tenant,
-            BarbeariaRepository barbearias) {
+            BarbeariaRepository barbearias,
+            AssinaturaService assinatura) {
         this.catalogo = catalogo;
         this.agendamentos = agendamentos;
         this.resumos = resumos;
         this.tenant = tenant;
         this.barbearias = barbearias;
+        this.assinatura = assinatura;
     }
 
     @GetMapping("/loja")
@@ -56,6 +60,7 @@ public class DonoController {
     @Transactional
     public Map<String, Object> atualizarLoja(@Valid @RequestBody AtualizarLojaRequest req) {
         Barbearia loja = tenant.exigirDonoComLoja();
+        assinatura.exigirAssinaturaAtiva(loja);
         loja.setNome(req.nome().trim());
         if (req.telefone() != null) {
             loja.setTelefone(req.telefone().isBlank() ? null : req.telefone().trim());

@@ -82,7 +82,7 @@ public final class CatalogoPlanos {
                 bd("68.90"), bd("351.39"), bd("578.76"));
         addFaixa(list, PlanoBarbearia.P_6_15, "6 a 15 profissionais", 15,
                 bd("102.90"), bd("524.79"), bd("864.36"));
-        addFaixa(list, PlanoBarbearia.P_16_PLUS, "Mais de 15 profissionais", 999,
+        addFaixa(list, PlanoBarbearia.P_16_PLUS, "16 a 20 profissionais", 20,
                 bd("137.90"), bd("703.29"), bd("1158.36"));
         return List.copyOf(list);
     }
