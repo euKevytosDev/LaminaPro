@@ -7,7 +7,7 @@
 | Front | https://eukevytosdev.github.io/LaminaPro/ |
 | Repo | https://github.com/euKevytosDev/LaminaPro |
 | Banco | Neon project `barberini` (`icy-surf-10621417`) |
-| API (preferida) | **Northflank** — `laminapro-api` |
+| API (preferida) | **Northflank** — https://p01--laminapro-api--w5zz78kgqjtj.code.run |
 | API (legado) | https://barberini-api.onrender.com (Render free, dorme) |
 
 ## Neon (banco)
@@ -48,9 +48,13 @@ GOOGLE_CLIENT_ID=868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleuserco
 ### Front apontando pra API Northflank
 
 ```js
-localStorage.setItem("encaixe_api_url", "https://p01--laminapro-api--w5zz78kgqjtj.code.run");
+localStorage.setItem("laminapro_api_url", "https://p01--laminapro-api--w5zz78kgqjtj.code.run");
 location.reload();
 ```
+
+URL pública: `https://p01--laminapro-api--w5zz78kgqjtj.code.run`  
+URL interna (cluster): `laminapro-api:8080`  
+Health: `https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/health`
 
 ## Login dono (seed)
 

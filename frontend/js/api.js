@@ -1,4 +1,4 @@
-/* API Encaixe — local / Northflank (preferida) / Render (legado) */
+/* API Lâmina Pro — local / Northflank */
 
 window.API = (() => {
   const isLocal =
@@ -6,12 +6,13 @@ window.API = (() => {
     location.hostname === "127.0.0.1" ||
     location.protocol === "file:";
 
-  /** Produção: override com localStorage encaixe_api_url após deploy Northflank */
-  const API_BASE_PROD = "https://barberini-api.onrender.com";
+  /** Produção: Northflank (override: localStorage laminapro_api_url ou encaixe_api_url) */
+  const API_BASE_PROD = "https://p01--laminapro-api--w5zz78kgqjtj.code.run";
 
   const BASE = isLocal
     ? "http://localhost:8080"
-    : localStorage.getItem("encaixe_api_url") ||
+    : localStorage.getItem("laminapro_api_url") ||
+      localStorage.getItem("encaixe_api_url") ||
       localStorage.getItem("barberini_api_url") ||
       API_BASE_PROD;
 
