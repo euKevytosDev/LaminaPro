@@ -1,12 +1,13 @@
-# Deploy — Encaixe
+# Deploy — Lâmina Pro
 
 ## Já no ar
 
 | Peça | Onde |
 |------|------|
-| Front | https://eukevytosdev.github.io/Barberini/ |
+| Front | https://eukevytosdev.github.io/LaminaPro/ |
+| Repo | https://github.com/euKevytosDev/LaminaPro |
 | Banco | Neon project `barberini` (`icy-surf-10621417`) |
-| API (preferida) | **Northflank** — ver abaixo |
+| API (preferida) | **Northflank** — `laminapro-api` |
 | API (legado) | https://barberini-api.onrender.com (Render free, dorme) |
 
 ## Neon (banco)
@@ -23,42 +24,38 @@ A URL **precisa** começar com `jdbc:postgresql://`.
 
 ## Northflank (API — recomendado)
 
-Plano Sandbox free: compute always-on (sem cold start de 15 min).  
-Se um dia precisar, o upgrade pago (~US$ 5) é o próximo passo.
+1. Project: `laminapro` · Service: `laminapro-api`
+2. Repo GitHub: `euKevytosDev/LaminaPro` (branch `main`)
+3. Dockerfile: `backend/Dockerfile` · context: `backend`
+4. Port `8080` · health `/api/health`
+5. Envs — ver bloco abaixo / `.env.northflank.example`
 
-### Passo a passo
+### Variáveis (Lâmina Pro)
 
-1. Crie conta em https://app.northflank.com e um **Project** (ex.: `encaixe`).
-2. **Add service** → **Combined service** (build + deploy) ou **Deployment** from GitHub.
-3. Conecte o repo `euKevytosDev/Barberini`.
-4. Build:
-   - **Dockerfile path:** `backend/Dockerfile`
-   - **Build context:** `backend`
-5. Port: **8080** (ou a que o painel injetar em `PORT`).
-6. Health check: `GET /api/health` (path `/api/health`).
-7. Environment — copie de `.env.northflank.example` e preencha Neon + `APP_JWT_SECRET`.
-8. Deploy e copie a URL pública (ex.: `https://encaixe-api-….northflank.app`).
+```text
+SPRING_PROFILES_ACTIVE=postgres
+SPRING_DATASOURCE_URL=jdbc:postgresql://HOST/neondb?sslmode=require
+SPRING_DATASOURCE_USERNAME=neondb_owner
+SPRING_DATASOURCE_PASSWORD=
+APP_JWT_SECRET=laminapro-jwt-troque-depois-em-producao-2026
+APP_PUBLIC_URL=https://eukevytosdev.github.io/LaminaPro
+APP_SEED_DONO_EMAIL=dono@laminapro.app
+APP_SEED_DONO_SENHA=dono123
+APP_SEED_DONO_NOME=Dono LaminaPro
+GOOGLE_CLIENT_ID=868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com
+```
 
-### Front apontando pra Northflank
-
-No navegador (Pages), abra o console uma vez:
+### Front apontando pra API Northflank
 
 ```js
-localStorage.setItem("encaixe_api_url", "https://SUA-URL.northflank.app");
+localStorage.setItem("encaixe_api_url", "https://p01--laminapro-api--w5zz78kgqjtj.code.run");
 location.reload();
 ```
 
-Ou altere o fallback em `frontend/js/api.js` (`API_BASE_PROD`) e faça push (Pages redeploya).
-
-### UptimeRobot (opcional na Northflank)
-
-No free always-on **não precisa** ping pra evitar cold start.  
-Se quiser monitoramento: `GET https://SUA-URL/api/health` a cada 5–10 min (timeout 30s).
-
 ## Login dono (seed)
 
-- E-mail: `dono@barberini.com`
-- Senha: `dono123`
+- Novo: `dono@laminapro.app` / `dono123`
+- Antigo (Neon): `dono@barberini.com` / `dono123`
 - Loja demo: `#/loja/demo`
 
 ## Login Google
@@ -70,5 +67,5 @@ Authorized JavaScript origins:
 
 ## Local
 
-- Front: `python3 -m http.server 5173` em `frontend/` → API `localhost:8080`
+- Front: `python3 -m http.server 5173` em `frontend/`
 - Back: Java 17 · perfil `local` (H2)
