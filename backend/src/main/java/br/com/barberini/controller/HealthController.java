@@ -9,6 +9,6 @@ import java.util.Map;
 public class HealthController {
     @GetMapping({"/api/health", "/health"})
     public Map<String, String> health() {
-        return Map.of("status", "ok", "app", "Encaixe");
+        return Map.of("status", "ok", "app", "LaminaPro");
     }
 }
