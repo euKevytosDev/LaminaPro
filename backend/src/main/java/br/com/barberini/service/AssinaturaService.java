@@ -35,14 +35,14 @@ public class AssinaturaService {
             MercadoPagoClient mercadoPago,
             @Value("${app.public-url:https://eukevytosdev.github.io/LaminaPro}") String publicUrl,
             @Value("${app.assinatura.webhook-url:}") String webhookUrl,
-            @Value("${app.assinatura.trial-dias:14}") int trialDias) {
+            @Value("${app.assinatura.trial-dias:7}") int trialDias) {
         this.barbearias = barbearias;
         this.mercadoPago = mercadoPago;
         String base = publicUrl == null ? "" : publicUrl.trim();
         if (!base.endsWith("/")) base = base + "/";
         this.frontUrl = base;
         this.webhookUrl = webhookUrl == null ? "" : webhookUrl.trim();
-        this.trialDias = trialDias > 0 ? trialDias : 14;
+        this.trialDias = trialDias > 0 ? trialDias : 7;
     }
 
     public List<Map<String, Object>> catalogo() {

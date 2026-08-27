@@ -45,7 +45,7 @@ APP_SEED_DONO_NOME=Dono LaminaPro
 GOOGLE_CLIENT_ID=868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com
 MERCADOPAGO_ACCESS_TOKEN=
 APP_ASSINATURA_WEBHOOK_URL=https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/assinatura/webhook
-APP_ASSINATURA_TRIAL_DIAS=14
+APP_ASSINATURA_TRIAL_DIAS=7
 ```
 
 ### Mercado Pago (assinatura da loja)
