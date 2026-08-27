@@ -17,6 +17,10 @@ public class Agendamento {
     private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "barbearia_id")
+    private Barbearia barbearia;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
     private Usuario cliente;
 
@@ -61,6 +65,8 @@ public class Agendamento {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    public Barbearia getBarbearia() { return barbearia; }
+    public void setBarbearia(Barbearia barbearia) { this.barbearia = barbearia; }
     public Usuario getCliente() { return cliente; }
     public void setCliente(Usuario cliente) { this.cliente = cliente; }
     public Barbeiro getBarbeiro() { return barbeiro; }

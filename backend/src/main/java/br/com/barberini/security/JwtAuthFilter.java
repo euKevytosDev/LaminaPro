@@ -37,7 +37,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Long id = jwtService.extrairUsuarioId(token);
                     String email = jwtService.extrairEmail(token);
                     String papel = jwtService.extrairPapel(token);
-                    UsuarioPrincipal principal = new UsuarioPrincipal(id, email, papel);
+                    Long barbeariaId = jwtService.extrairBarbeariaId(token);
+                    UsuarioPrincipal principal = new UsuarioPrincipal(id, email, papel, barbeariaId);
                     var auth = new UsernamePasswordAuthenticationToken(
                             principal, null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + papel))

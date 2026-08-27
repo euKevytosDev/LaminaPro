@@ -1,9 +1,11 @@
 package br.com.barberini.config;
 
+import br.com.barberini.model.Barbearia;
 import br.com.barberini.model.Barbeiro;
 import br.com.barberini.model.Papel;
 import br.com.barberini.model.Servico;
 import br.com.barberini.model.Usuario;
+import br.com.barberini.repository.BarbeariaRepository;
 import br.com.barberini.repository.BarbeiroRepository;
 import br.com.barberini.repository.ServicoRepository;
 import br.com.barberini.repository.UsuarioRepository;
@@ -21,6 +23,7 @@ public class SeedConfig {
     @Bean
     CommandLineRunner seed(
             UsuarioRepository usuarios,
+            BarbeariaRepository barbearias,
             BarbeiroRepository barbeiros,
             ServicoRepository servicos,
             PasswordEncoder encoder,
@@ -28,15 +31,28 @@ public class SeedConfig {
             @Value("${app.seed.dono.senha}") String donoSenha,
             @Value("${app.seed.dono.nome}") String donoNome) {
         return args -> {
-            if (!usuarios.existsByEmailIgnoreCase(donoEmail)) {
-                usuarios.save(new Usuario(donoEmail.toLowerCase(), donoNome, encoder.encode(donoSenha), Papel.DONO));
+            Barbearia demo = barbearias.findBySlugIgnoreCase("demo")
+                    .orElseGet(() -> barbearias.save(new Barbearia("Barbearia Demo", "demo")));
+
+            Usuario dono = usuarios.findByEmailIgnoreCase(donoEmail).orElse(null);
+            if (dono == null) {
+                dono = new Usuario(donoEmail.toLowerCase(), donoNome, encoder.encode(donoSenha), Papel.DONO);
+                dono.setBarbearia(demo);
+                usuarios.save(dono);
+            } else if (dono.getBarbearia() == null) {
+                dono.setBarbearia(demo);
+                if (dono.getPapel() != Papel.DONO) {
+                    dono.setPapel(Papel.DONO);
+                }
+                usuarios.save(dono);
             }
-            if (barbeiros.count() == 0) {
-                barbeiros.save(new Barbeiro("Abner Barber", "AB", "#3d3d3d"));
-                barbeiros.save(new Barbeiro("Julio César", "JC", "#555555"));
-                barbeiros.save(new Barbeiro("Lucas Barber", "LB", "#2a2a2a"));
+
+            if (barbeiros.countByBarbeariaId(demo.getId()) == 0) {
+                barbeiros.save(new Barbeiro(demo, "Abner Barber", "AB", "#3d3d3d"));
+                barbeiros.save(new Barbeiro(demo, "Julio César", "JC", "#555555"));
+                barbeiros.save(new Barbeiro(demo, "Lucas Barber", "LB", "#2a2a2a"));
             }
-            if (servicos.count() == 0) {
+            if (servicos.countByBarbeariaId(demo.getId()) == 0) {
                 Object[][] lista = {
                         {"Acabamento barba", "15", 15},
                         {"Acabamento cabelo", "15", 15},
@@ -58,6 +74,7 @@ public class SeedConfig {
                 };
                 for (Object[] s : lista) {
                     servicos.save(new Servico(
+                            demo,
                             (String) s[0],
                             new BigDecimal((String) s[1]),
                             (Integer) s[2]

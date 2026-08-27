@@ -7,5 +7,6 @@ public record BarbeiroRequest(
         @NotBlank @Size(max = 80) String nome,
         @Size(max = 4) String iniciais,
         @Size(max = 20) String cor,
-        Boolean ativo
+        Boolean ativo,
+        String fotoData
 ) {}

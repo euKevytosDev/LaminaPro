@@ -1,4 +1,4 @@
-/* Barberini — mobile first, cara de app (espelho do app atual) */
+/* Encaixe — mobile first, multi-tenant SaaS */
 
 :root {
   --preto: #1a1a1a;
@@ -2281,6 +2281,304 @@ body {
 
   .tela-app {
     grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+/* ---------- entry / gate (premium light) ---------- */
+.tela-entry,
+.tela-criar-loja {
+  min-height: 100dvh;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #f7f7f5 0%, #ebebe8 45%, #e2e2df 100%);
+  color: var(--preto);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px calc(28px + var(--safe-bottom));
+  position: relative;
+}
+.tela-entry .login-rodape,
+.tela-criar-loja .login-rodape {
+  color: var(--texto-suave);
+  opacity: 1;
+}
+.entry-marca {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 0 16px;
+}
+.tela-entry .login-b,
+.tela-criar-loja .login-b {
+  border-color: var(--preto);
+  color: var(--preto);
+}
+.tela-entry .login-titulo,
+.tela-criar-loja .login-titulo,
+.tela-criar-loja h1 {
+  color: var(--preto);
+}
+.tela-entry .login-subtitulo {
+  color: var(--texto-suave);
+  opacity: 1;
+  letter-spacing: 0.18em;
+}
+.entry-acoes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+.tela-entry .btn-login-principal {
+  background: var(--preto);
+  color: #fff;
+}
+.tela-entry .btn-login-ghost,
+.tela-criar-loja .btn-login-ghost {
+  border-color: rgba(26, 26, 26, 0.22);
+  color: var(--preto);
+}
+.entry-agendar {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.entry-agendar-rotulo {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+.entry-slug-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.entry-slug-prefix {
+  padding: 0 0 0 12px;
+  font-size: 0.78rem;
+  color: var(--cinza);
+  white-space: nowrap;
+}
+.entry-slug-row input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 14px 8px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--preto);
+  min-width: 0;
+}
+.entry-slug-row input:focus {
+  outline: none;
+}
+.btn-entry-ir {
+  border: none;
+  background: var(--preto);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.tela-entry .btn-login-ghost#btn-entry-demo {
+  margin-top: 8px;
+  border: none;
+  text-decoration: underline;
+  opacity: 0.75;
+  font-weight: 500;
+  padding: 8px;
+}
+
+/* ---------- criar loja ---------- */
+.criar-loja-topo {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.criar-loja-topo h1 {
+  font-family: var(--fonte-marca);
+  font-size: 1.65rem;
+  margin: 0 0 4px;
+  letter-spacing: 0.04em;
+}
+.criar-loja-topo p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+}
+.btn-voltar-entry {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: var(--preto);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.tela-login .btn-voltar-entry {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+  width: auto;
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+.criar-loja-form {
+  max-width: 420px;
+  width: 100%;
+  margin: 0 auto;
+}
+.tela-criar-loja .login-acoes label {
+  color: var(--texto-suave);
+  opacity: 1;
+}
+.tela-criar-loja .login-acoes input {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: var(--preto);
+}
+.tela-criar-loja .login-acoes input::placeholder {
+  color: rgba(0, 0, 0, 0.35);
+}
+.tela-criar-loja .btn-login-principal {
+  background: var(--preto);
+  color: #fff;
+  margin-top: 8px;
+}
+.slug-preview {
+  display: block;
+  font-size: 0.82rem;
+  margin: 2px 0 6px;
+  color: var(--preto);
+}
+.slug-preview .muted {
+  color: var(--cinza);
+}
+.opcional {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* ---------- avatars com foto ---------- */
+.avatar.avatar-foto,
+.avatar-foto {
+  padding: 0;
+  overflow: hidden;
+}
+.avatar.avatar-foto img,
+.avatar-foto img,
+.logo-mini.com-logo img,
+.foto-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.logo-mini.com-logo {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.foto-preview {
+  margin-top: 8px;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--linha);
+  background: #ddd;
+}
+
+/* ---------- lembrete badge ---------- */
+.badge-lembrete {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: rgba(42, 157, 143, 0.15);
+  color: #1f6f66;
+}
+.tags-ag-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* ---------- barra salvar bloqueios ---------- */
+.barra-salvar-bloqueios {
+  position: fixed;
+  left: 50%;
+  bottom: calc(72px + var(--safe-bottom));
+  transform: translateX(-50%);
+  z-index: 9000;
+  width: min(400px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--preto);
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  animation: barra-in 0.22s ease;
+}
+.barra-salvar-bloqueios span {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.barra-salvar-bloqueios .btn {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+}
+@keyframes barra-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.btn-assinatura-painel {
+  width: 100%;
+  margin: 4px 0 14px;
+  border: 1px solid rgba(26, 26, 26, 0.18);
+  background: #fff;
+  color: var(--preto);
+  font: inherit;
+  font-weight: 700;
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.form-loja {
+  display: block !important;
+}
+
+@media (min-width: 900px) {
+  .barra-salvar-bloqueios {
+    bottom: 28px;
+    left: calc(50% + 110px);
+  }
+  .tela-entry,
+  .tela-criar-loja {
+    max-width: 430px;
+    margin: 0 auto;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
   }
 }
 

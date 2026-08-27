@@ -1,13 +1,14 @@
 package br.com.barberini.service;
 
 import br.com.barberini.model.Agendamento;
+import br.com.barberini.model.Barbearia;
 import br.com.barberini.model.Barbeiro;
 import br.com.barberini.model.BloqueioHorario;
 import br.com.barberini.model.StatusAgendamento;
 import br.com.barberini.repository.AgendamentoRepository;
 import br.com.barberini.repository.BarbeiroRepository;
 import br.com.barberini.repository.BloqueioHorarioRepository;
-import br.com.barberini.security.AuthSupport;
+import br.com.barberini.security.TenantSupport;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,21 +39,26 @@ public class ResumoService {
     private final BarbeiroRepository barbeiros;
     private final BloqueioHorarioRepository bloqueios;
     private final AgendaService agenda;
+    private final TenantSupport tenant;
 
     public ResumoService(
             AgendamentoRepository agendamentos,
             BarbeiroRepository barbeiros,
             BloqueioHorarioRepository bloqueios,
-            AgendaService agenda) {
+            AgendaService agenda,
+            TenantSupport tenant) {
         this.agendamentos = agendamentos;
         this.barbeiros = barbeiros;
         this.bloqueios = bloqueios;
         this.agenda = agenda;
+        this.tenant = tenant;
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> resumo(LocalDate inicio, LocalDate fim) {
-        AuthSupport.exigirDono();
+        Barbearia loja = tenant.exigirDonoComLoja();
+        Long lojaId = loja.getId();
+
         if (inicio == null) inicio = LocalDate.now();
         if (fim == null) fim = inicio;
         if (fim.isBefore(inicio)) {
@@ -64,8 +70,8 @@ public class ResumoService {
         }
 
         LocalDateTime agora = LocalDateTime.now();
-        List<Agendamento> todos = agendamentos.findPeriodo(inicio, fim);
-        List<Barbeiro> ativos = barbeiros.findByAtivoTrueOrderByNomeAsc();
+        List<Agendamento> todos = agendamentos.findByBarbeariaIdAndPeriodo(lojaId, inicio, fim);
+        List<Barbeiro> ativos = barbeiros.findByBarbeariaIdAndAtivoTrueOrderByNomeAsc(lojaId);
 
         Acumulador geral = new Acumulador();
         Map<Long, Acumulador> porBarbeiro = new LinkedHashMap<>();
@@ -92,7 +98,7 @@ public class ResumoService {
             }
         }
 
-        int slotsTotais = capacidadeSlots(inicio, fim, ativos.size());
+        int slotsTotais = capacidadeSlots(lojaId, inicio, fim, ativos.size());
         int slotsPorBarbeiro = ativos.isEmpty() ? 0 : slotsTotais / ativos.size();
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -114,19 +120,19 @@ public class ResumoService {
         out.put("ocupacao", percentual(geral.slotsOcupados, slotsTotais));
         out.put("slotsTotais", slotsTotais);
         out.put("slotsOcupados", geral.slotsOcupados);
-        out.put("clientes", clientes(clientesAtendidos, inicio));
+        out.put("clientes", clientes(lojaId, clientesAtendidos, inicio));
         out.put("porBarbeiro", listaBarbeiros(ativos, porBarbeiro, slotsPorBarbeiro));
         out.put("porServico", listaServicos(porServico));
         out.put("serie", serie(porDia, inicio, fim, dias));
         return out;
     }
 
-    private Map<String, Object> clientes(Set<Long> atendidos, LocalDate inicio) {
+    private Map<String, Object> clientes(Long barbeariaId, Set<Long> atendidos, LocalDate inicio) {
         int total = atendidos.size();
         int recorrentes = 0;
         if (total > 0) {
-            recorrentes = agendamentos.clientesComHistoricoAntes(
-                    new ArrayList<>(atendidos), inicio, StatusAgendamento.CANCELADO).size();
+            recorrentes = agendamentos.clientesComHistoricoAntesNaLoja(
+                    barbeariaId, new ArrayList<>(atendidos), inicio, StatusAgendamento.CANCELADO).size();
         }
         return Map.of(
                 "atendidos", total,
@@ -204,7 +210,7 @@ public class ResumoService {
     }
 
     /** Slots que a barbearia tinha para vender no período, descontando bloqueios. */
-    private int capacidadeSlots(LocalDate inicio, LocalDate fim, int qtdBarbeiros) {
+    private int capacidadeSlots(Long barbeariaId, LocalDate inicio, LocalDate fim, int qtdBarbeiros) {
         if (qtdBarbeiros == 0) return 0;
         int slotsDia = agenda.gerarSlotsBase().size();
         int total = 0;
@@ -212,7 +218,7 @@ public class ResumoService {
             if (d.getDayOfWeek() == DayOfWeek.SUNDAY) continue;
             total += slotsDia * qtdBarbeiros;
         }
-        for (BloqueioHorario b : bloqueios.findByDataBetween(inicio, fim)) {
+        for (BloqueioHorario b : bloqueios.findByBarbeariaIdAndDataBetween(barbeariaId, inicio, fim)) {
             total -= b.getBarbeiro() == null ? qtdBarbeiros : 1;
         }
         return Math.max(0, total);
@@ -232,7 +238,6 @@ public class ResumoService {
             case CANCELADO -> Situacao.CANCELADO;
             case NAO_COMPARECEU -> Situacao.NAO_COMPARECEU;
             case FINALIZADO -> Situacao.REALIZADO;
-            // Confirmado que já passou do horário vale como finalizado (padrão)
             case CONFIRMADO -> LocalDateTime.of(a.getData(), a.getHoraFim()).isAfter(agora)
                     ? Situacao.PREVISTO
                     : Situacao.REALIZADO;

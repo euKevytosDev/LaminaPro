@@ -1,8 +1,14 @@
-/* Barberini — dados e regras de negócio (espelho do app atual) */
+/* Encaixe — produto, regras de agenda e utilitários */
 
-window.BARBERINI = {
-  estabelecimento: "BARBERINI",
-  nomeCompleto: "Barberini Barbearia",
+window.ENCAIXE = {
+  produto: {
+    nome: "Encaixe",
+    tagline: "Agenda que encaixa",
+  },
+
+  /** Preenchido dinamicamente pela loja (API) */
+  estabelecimento: "ENCAIXE",
+  nomeCompleto: "Encaixe",
   timezone: "America/Sao_Paulo",
 
   /** Cancelamento com menos de 1h: taxa 50% + bloqueio até pagar */
@@ -15,10 +21,10 @@ window.BARBERINI = {
       "fica bloqueado até o pagamento da taxa.",
   },
 
-  /** Janela de agenda do cliente (como no app) */
+  /** Janela de agenda do cliente */
   janelaAgendaDias: 30,
 
-  /** Slots de 30 minutos; intervalo de almoço 12:00–13:30 */
+  /** Slots de 30 minutos; intervalo de almoço 12:00–13:30 (defaults) */
   agenda: {
     slotMinutos: 30,
     abertura: "09:00",
@@ -28,39 +34,18 @@ window.BARBERINI = {
     diasFuncionamento: [1, 2, 3, 4, 5, 6], // seg–sáb (0=dom)
   },
 
-  barbeiros: [
-    { id: "abner", nome: "Abner Barber", iniciais: "AB", cor: "#3d3d3d" },
-    { id: "julio", nome: "Julio César", iniciais: "JC", cor: "#555555" },
-    { id: "lucas", nome: "Lucas Barber", iniciais: "LB", cor: "#2a2a2a" },
-  ],
-
+  /** Catálogo vem da API da loja — sem fallback hardcoded */
+  barbeiros: [],
   categorias: [{ id: "cabelo", nome: "CABELO" }],
-
-  /** Preços e nomes exatamente como no app do vídeo */
-  servicos: [
-    { id: "acab-barba", nome: "Acabamento barba", preco: 15, duracao: 15, categoria: "cabelo" },
-    { id: "acab-cabelo", nome: "Acabamento cabelo", preco: 15, duracao: 15, categoria: "cabelo" },
-    { id: "barboterapia", nome: "Barboterapia", preco: 35, duracao: 30, categoria: "cabelo" },
-    { id: "barb-acab", nome: "Barboterapia + acabamento cabelo", preco: 50, duracao: 45, categoria: "cabelo" },
-    { id: "barb-sobr", nome: "Barboterapia + sobrancelha", preco: 50, duracao: 40, categoria: "cabelo" },
-    { id: "corte", nome: "Corte", preco: 45, duracao: 30, categoria: "cabelo" },
-    { id: "corte-acab-barba", nome: "Corte + acabamento barba", preco: 60, duracao: 40, categoria: "cabelo" },
-    { id: "corte-acab-sobr", nome: "Corte + acabamento barba + sobrancelha", preco: 75, duracao: 50, categoria: "cabelo" },
-    { id: "corte-barb", nome: "Corte + Barboterapia", preco: 80, duracao: 60, categoria: "cabelo" },
-    { id: "corte-barb-sel", nome: "Corte + Barboterapia + selagem", preco: 170, duracao: 90, categoria: "cabelo" },
-    { id: "corte-sel", nome: "Corte + selagem", preco: 135, duracao: 75, categoria: "cabelo" },
-    { id: "corte-sobr", nome: "Corte + sobrancelha", preco: 60, duracao: 40, categoria: "cabelo" },
-    { id: "corte-barb-sobr", nome: "Corte + barboterapia + sobrancelha", preco: 95, duracao: 70, categoria: "cabelo" },
-    { id: "limpeza", nome: "Limpeza de pele (contra oleosidade)", preco: 20, duracao: 20, categoria: "cabelo" },
-    { id: "selagem", nome: "Selagem", preco: 90, duracao: 60, categoria: "cabelo" },
-    { id: "sobrancelha", nome: "Sobrancelha", preco: 15, duracao: 15, categoria: "cabelo" },
-    { id: "tintura", nome: "Tintura (A partir de)", preco: 40, duracao: 45, categoria: "cabelo" },
-  ],
+  servicos: [],
 };
 
-window.BARBERINI.utils = {
+window.ENCAIXE.utils = {
   dinheiro(v) {
-    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    return Number(v || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
   },
 
   pad2(n) {
@@ -69,7 +54,7 @@ window.BARBERINI.utils = {
 
   /** "09:00" → minutos desde meia-noite */
   horaParaMinutos(hhmm) {
-    const [h, m] = hhmm.split(":").map(Number);
+    const [h, m] = String(hhmm).split(":").map(Number);
     return h * 60 + m;
   },
 
@@ -82,7 +67,7 @@ window.BARBERINI.utils = {
   /** Gera slots livres do dia (respeitando almoço) */
   gerarSlots() {
     const { abertura, fechamento, almocoInicio, almocoFim, slotMinutos } =
-      window.BARBERINI.agenda;
+      window.ENCAIXE.agenda;
     const ini = this.horaParaMinutos(abertura);
     const fim = this.horaParaMinutos(fechamento);
     const aIni = this.horaParaMinutos(almocoInicio);
@@ -97,7 +82,7 @@ window.BARBERINI.utils = {
 
   /** Fim do atendimento a partir do início + duração do serviço */
   fimAtendimento(inicioHhmm, duracaoMin) {
-    const slot = window.BARBERINI.agenda.slotMinutos;
+    const slot = window.ENCAIXE.agenda.slotMinutos;
     const blocos = Math.max(1, Math.ceil(duracaoMin / slot));
     const fim = this.horaParaMinutos(inicioHhmm) + blocos * slot;
     return this.minutosParaHora(fim);
@@ -140,4 +125,34 @@ window.BARBERINI.utils = {
       a.getDate() === b.getDate()
     );
   },
+
+  /** Slug amigável a partir do nome da barbearia */
+  slugify(texto) {
+    return String(texto || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+  },
+
+  /** Comprime imagem (file/blob) para JPEG data URL ~max 400px / quality 0.7 */
+  async comprimirImagem(file, maxPx = 400, quality = 0.7) {
+    if (!file) return null;
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxPx / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close?.();
+    return canvas.toDataURL("image/jpeg", quality);
+  },
 };
+
+/** Alias legado — código antigo que ainda referencia BARBERINI */
+window.BARBERINI = window.ENCAIXE;

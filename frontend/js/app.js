@@ -1,8 +1,9 @@
-/* Barberini — app web mobile-first com sync na confirmação */
+/* Encaixe — app web multi-tenant, mobile-first, sync na confirmação */
 
 (() => {
-  const U = () => window.BARBERINI.utils;
-  const B = () => window.BARBERINI;
+  const U = () => window.ENCAIXE.utils;
+  const B = () => window.ENCAIXE;
+  const P = () => window.ENCAIXE.produto;
 
   const booking = {
     path: null,
@@ -19,21 +20,35 @@
   let ultimoAgendamento = null;
   let painelSecao = "resumo";
 
-  /** Painel: resumo/dashboard */
   let resumoPeriodo = "hoje";
   let resumoInicio = null;
   let resumoFim = null;
   let agendaFiltro = "hoje";
 
-  /** Painel: desativar horários (UI estilo agenda do cliente) */
+  /** Contexto de rota: entry | criar-loja | login | loja | dono */
+  let rotaAtual = { tipo: "entry", slug: null };
+
+  /** Painel: horários (draft local + sync no salvar) */
   let bloqueioBarbeiroId = null;
   let bloqueioDataSel = new Date();
   let bloqueioCalCursor = new Date();
-  let bloqueiosDoDia = []; // cache da data selecionada
+  /** Map hora → { id?, hora } do servidor (baseline) */
+  let bloqueiosServerMap = new Map();
+  /** Set de horas bloqueadas no draft local */
+  let bloqueiosDraftSet = new Set();
+  let bloqueiosDirty = false;
+  let bloqueiosOcupados = new Set();
+  let bloqueiosSlugDraftKey = "";
+
+  /** Lembretes browser */
+  let lembreteTimers = [];
+  let lembreteIds = new Set();
+  let notifPedida = false;
 
   const GOOGLE_CLIENT_ID =
     "868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com";
   let googlePronto = false;
+  let slugAutoEditado = true;
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -57,6 +72,50 @@
     t.classList.add("visivel");
     clearTimeout(t._timer);
     t._timer = setTimeout(() => t.classList.remove("visivel"), 2800);
+  }
+
+  function nomeLojaDisplay() {
+    const loja = Store.getLoja();
+    if (loja?.nome) return loja.nome.toUpperCase();
+    if (rotaAtual.tipo === "dono") return P().nome.toUpperCase();
+    return (B().estabelecimento || P().nome).toUpperCase();
+  }
+
+  function letraMarca() {
+    const n = nomeLojaDisplay();
+    return (n && n[0]) || "E";
+  }
+
+  function atualizarMarcasUI() {
+    const nome = nomeLojaDisplay();
+    const letra = letraMarca();
+    const header = $("#header-marca");
+    if (header) header.textContent = rotaAtual.tipo === "dono" ? "ENCAIXE" : nome;
+    const mini = $("#logo-mini");
+    if (mini) {
+      const loja = Store.getLoja();
+      if (loja?.logoData && rotaAtual.tipo !== "dono") {
+        mini.innerHTML = `<img src="${loja.logoData}" alt="" />`;
+        mini.classList.add("com-logo");
+      } else {
+        mini.textContent = rotaAtual.tipo === "dono" ? "E" : letra;
+        mini.classList.remove("com-logo");
+      }
+    }
+    const vazia = $("#agenda-vazia-marca");
+    if (vazia) vazia.textContent = nome;
+    $$(".marca-dinamica").forEach((el) => {
+      el.textContent = nome;
+    });
+  }
+
+  function avatarHtml(pessoa, fallbackIni = "?") {
+    const cor = pessoa?.cor || "#333";
+    const ini = pessoa?.iniciais || fallbackIni;
+    if (pessoa?.fotoData) {
+      return `<div class="avatar avatar-foto" style="background:${cor}"><img src="${pessoa.fotoData}" alt="" /></div>`;
+    }
+    return `<div class="avatar" style="background:${cor}">${ini}</div>`;
   }
 
   function salvarDraft() {
@@ -110,18 +169,106 @@
     );
   }
 
-  /* ---------- auth ---------- */
+  /* ---------- routing (hash) ---------- */
 
-  function usuarioLogado() {
-    return Store.getUsuario();
+  function parseHash() {
+    const raw = (location.hash || "").replace(/^#/, "");
+    const path = raw.replace(/^\//, "");
+    if (!path || path === "/") return { tipo: "entry", slug: null };
+    const parts = path.split("/").filter(Boolean);
+    if (parts[0] === "loja" && parts[1]) {
+      return { tipo: "loja", slug: parts[1].toLowerCase() };
+    }
+    if (parts[0] === "criar-loja") return { tipo: "criar-loja", slug: null };
+    if (parts[0] === "login") return { tipo: "login", slug: Store.getSlug() || null };
+    return { tipo: "entry", slug: null };
   }
 
-  async function entrarApp() {
+  function setHash(path) {
+    const next = path.startsWith("#") ? path : `#${path}`;
+    if (location.hash === next) {
+      onHashChange();
+      return;
+    }
+    location.hash = next;
+  }
+
+  function esconderTelas() {
+    hide($("#tela-entry"));
+    hide($("#tela-criar-loja"));
     hide($("#tela-login"));
+    hide($("#tela-app"));
+  }
+
+  function mostrarEntry() {
+    esconderTelas();
+    show($("#tela-entry"));
+    rotaAtual = { tipo: "entry", slug: null };
+  }
+
+  function mostrarCriarLoja() {
+    esconderTelas();
+    show($("#tela-criar-loja"));
+    rotaAtual = { tipo: "criar-loja", slug: null };
+    slugAutoEditado = true;
+    atualizarSlugPreview();
+  }
+
+  function mostrarLogin(ctx = {}) {
+    esconderTelas();
+    show($("#tela-login"));
+    rotaAtual = { tipo: "login", slug: ctx.slug || Store.getSlug() || null };
+    const loja = Store.getLoja();
+    const titulo = $("#login-marca-titulo");
+    const sub = $("#login-marca-sub");
+    const letra = $("#login-logo-letra");
+    if (rotaAtual.slug && loja?.nome) {
+      if (titulo) titulo.textContent = loja.nome.toUpperCase();
+      if (sub) sub.textContent = "Agende seu horário";
+      if (letra) letra.textContent = (loja.nome[0] || "E").toUpperCase();
+    } else {
+      if (titulo) titulo.textContent = "ENCAIXE";
+      if (sub) sub.textContent = P().tagline;
+      if (letra) letra.textContent = "E";
+    }
+    initGoogleSignIn();
+  }
+
+  async function entrarApp({ modo = null, tab = null } = {}) {
+    const u = usuarioLogado();
+    const slug = Store.getSlug();
+    const modoFinal =
+      modo ||
+      (u?.papel === "DONO" && !slug ? "dono" : slug ? "loja" : u?.papel === "DONO" ? "dono" : "loja");
+
+    rotaAtual = {
+      tipo: modoFinal,
+      slug: slug || u?.slug || null,
+    };
+
+    if (modoFinal === "dono" && u?.slug) {
+      Store.setLoja(u.slug);
+      try {
+        await Store.donoLoja();
+      } catch {
+        /* ok */
+      }
+    }
+
+    esconderTelas();
     show($("#tela-app"));
+    atualizarMarcasUI();
     atualizarHeaderUsuario();
     atualizarNavDono();
-    await Store.syncCatalogo();
+
+    if (Store.getSlug()) {
+      try {
+        await Store.syncCatalogo();
+      } catch {
+        /* offline */
+      }
+    }
+
     if (Store.temAuthReal()) {
       try {
         await Store.syncMeusAgendamentos();
@@ -129,21 +276,92 @@
         /* local ok */
       }
     }
+
     renderAgenda();
-    ativarTab("agenda");
+    const tabInicial =
+      tab || (modoFinal === "dono" ? "painel" : "agenda");
+    ativarTab(tabInicial);
+  }
+
+  async function entrarLoja(slug) {
+    const s = String(slug || "")
+      .trim()
+      .toLowerCase();
+    if (!s) {
+      toast("Informe o link da loja");
+      return;
+    }
+    try {
+      Store.setLoja(s);
+      await Store.carregarLojaPublica(s);
+      setHash(`/loja/${s}`);
+      await entrarApp({ modo: "loja", tab: "agenda" });
+    } catch (e) {
+      toast(e.message || "Loja não encontrada");
+      mostrarEntry();
+    }
+  }
+
+  async function onHashChange() {
+    const rota = parseHash();
+    rotaAtual = rota;
+
+    if (rota.tipo === "criar-loja") {
+      mostrarCriarLoja();
+      return;
+    }
+
+    if (rota.tipo === "loja") {
+      try {
+        Store.setLoja(rota.slug);
+        await Store.carregarLojaPublica(rota.slug);
+        const u = usuarioLogado();
+        if (u && !u.demo) {
+          await entrarApp({ modo: "loja" });
+        } else if (u) {
+          await entrarApp({ modo: "loja" });
+        } else {
+          // loja pública: permite navegar sem login (wizard pede na confirmação)
+          await entrarApp({ modo: "loja" });
+        }
+      } catch (e) {
+        toast(e.message || "Loja não encontrada");
+        setHash("/");
+      }
+      return;
+    }
+
+    if (rota.tipo === "login") {
+      mostrarLogin({ slug: Store.getSlug() });
+      return;
+    }
+
+    // entry / gate
+    const u = usuarioLogado();
+    if (u && u.papel === "DONO" && Store.temAuthReal() && !u.demo) {
+      if (u.slug) Store.setLoja(u.slug);
+      await entrarApp({ modo: "dono", tab: "painel" });
+      return;
+    }
+    mostrarEntry();
+  }
+
+  function usuarioLogado() {
+    return Store.getUsuario();
   }
 
   function irParaLogin() {
-    show($("#tela-login"));
-    hide($("#tela-app"));
-    fecharWizard();
-    initGoogleSignIn();
+    setHash("/login");
   }
 
   function atualizarHeaderUsuario() {
     const u = usuarioLogado();
     const el = $("#header-user");
-    if (!el || !u) return;
+    if (!el) return;
+    if (!u) {
+      el.textContent = "Visitante";
+      return;
+    }
     const papel = u.papel === "DONO" ? "Dono" : "Cliente";
     el.textContent = `${papel} | ${u.nome}`;
   }
@@ -151,9 +369,11 @@
   function atualizarNavDono() {
     const tab = $("#tab-painel");
     const btnOpcoes = $("#btn-painel-opcoes");
+    const btnAssinatura = $("#btn-assinatura");
     const dono = Store.isDono();
     if (tab) tab.classList.toggle("oculto", !dono);
     if (btnOpcoes) btnOpcoes.classList.toggle("oculto", !dono);
+    if (btnAssinatura) btnAssinatura.classList.toggle("oculto", !dono);
   }
 
   function alternarModoAuth(cadastro) {
@@ -178,10 +398,57 @@
     const h = $("#titulo-aba");
     if (h) h.textContent = titulos[nome] || "Agenda";
     const fab = $("#btn-agendar");
-    if (fab) fab.classList.toggle("oculto", nome !== "agenda");
+    if (fab) {
+      const showFab = nome === "agenda" && rotaAtual.tipo === "loja";
+      fab.classList.toggle("oculto", !showFab);
+    }
     if (nome === "agenda") renderAgenda();
     if (nome === "perfil") renderPerfil();
     if (nome === "painel") renderPainel();
+  }
+
+  /* ---------- lembretes (Notification API, sem custo) ---------- */
+
+  function pedirPermissaoNotificacao() {
+    if (!("Notification" in window) || notifPedida) return;
+    notifPedida = true;
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }
+
+  function limparLembretes() {
+    lembreteTimers.forEach((id) => clearTimeout(id));
+    lembreteTimers = [];
+    lembreteIds = new Set();
+  }
+
+  function agendarLembretesBrowser(itens) {
+    limparLembretes();
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+    const MAX_MS = 6 * 60 * 60 * 1000; // cap 6h
+    const agora = Date.now();
+    itens.forEach((ag) => {
+      if (ag.status === "CANCELADO" || ag.status === "FINALIZADO") return;
+      const when = new Date(`${ag.data}T${String(ag.hora).substring(0, 5)}:00`).getTime();
+      const remindAt = when - 60 * 60 * 1000;
+      const delay = remindAt - agora;
+      if (delay <= 0 || delay > MAX_MS) return;
+      lembreteIds.add(String(ag.id));
+      const tid = setTimeout(() => {
+        try {
+          new Notification("Lembrete Encaixe", {
+            body: `${ag.servicoNome || "Agendamento"} às ${String(ag.hora).substring(0, 5)}`,
+            tag: `encaixe-${ag.id}`,
+          });
+        } catch {
+          /* ignore */
+        }
+      }, delay);
+      lembreteTimers.push(tid);
+    });
   }
 
   /* ---------- agenda ---------- */
@@ -190,6 +457,10 @@
     const lista = $("#lista-agenda");
     const vazia = $("#agenda-vazia");
     const itens = Store.proximos(B().janelaAgendaDias);
+
+    pedirPermissaoNotificacao();
+    agendarLembretesBrowser(itens);
+    atualizarMarcasUI();
 
     if (!itens.length) {
       show(vazia);
@@ -201,11 +472,16 @@
     lista.innerHTML = itens
       .map((ag) => {
         const serv = Store.getServico(ag.servicoId);
-        const barb = Store.getBarbeiro(ag.barbeiroId);
+        const barb = Store.getBarbeiro(ag.barbeiroId) || {
+          nome: ag.barbeiroNome,
+          iniciais: ag.barbeiroIniciais,
+          cor: ag.barbeiroCor,
+        };
         const d = U().parseISODate(ag.data);
         const dia = U().diaSemanaCurto(d);
         const fim = ag.fim || U().fimAtendimento(ag.hora, serv?.duracaoMin || 30);
         const fechado = ag.status === "FINALIZADO" || ag.status === "NAO_COMPARECEU";
+        const temLembrete = lembreteIds.has(String(ag.id));
         return `
           <article class="card-agendamento" data-id="${ag.id}">
             <div class="card-agendamento-faixa"></div>
@@ -215,11 +491,14 @@
                 <span>${U().formatarDataBR(ag.data)}</span>
               </div>
               <div class="card-agendamento-info">
-                <div class="avatar" style="background:${barb?.cor || ag.barbeiroCor || "#333"}">${barb?.iniciais || ag.barbeiroIniciais || "?"}</div>
+                ${avatarHtml(barb)}
                 <div>
                   <strong>${barb?.nome || ag.barbeiroNome || "Barbeiro"}</strong>
                   <p>${serv?.nome || ag.servicoNome || "Serviço"}</p>
-                  ${fechado ? `<span class="badge-status ${ag.status.toLowerCase()}">${ag.status === "FINALIZADO" ? "Atendido" : "Não compareceu"}</span>` : ""}
+                  <div class="tags-ag-inline">
+                    ${fechado ? `<span class="badge-status ${ag.status.toLowerCase()}">${ag.status === "FINALIZADO" ? "Atendido" : "Não compareceu"}</span>` : ""}
+                    ${temLembrete ? `<span class="badge-lembrete">Lembrete</span>` : ""}
+                  </div>
                 </div>
                 ${fechado ? "" : `<button type="button" class="btn-menu-ag" data-id="${ag.id}" aria-label="Opções">⋮</button>`}
               </div>
@@ -281,6 +560,10 @@
   /* ---------- wizard ---------- */
 
   function abrirWizard() {
+    if (!Store.getSlug()) {
+      toast("Abra uma loja pelo link para agendar");
+      return;
+    }
     resetBooking();
     show($("#wizard"));
     irPasso("escolha");
@@ -297,7 +580,7 @@
     if (ativo === "escolha") fecharWizard();
     else if (ativo === "servicos") irPasso(path === "profissional" ? "barbeiro" : "escolha");
     else if (ativo === "barbeiro") irPasso("escolha");
-    else if (ativo === "profissional") irPasso(path === "profissional" ? "servicos" : "servicos");
+    else if (ativo === "profissional") irPasso("servicos");
     else if (ativo === "confirmar") irPasso("profissional");
     else if (ativo === "sucesso") fecharWizard();
     else fecharWizard();
@@ -306,6 +589,7 @@
   function irPasso(nome) {
     $$(".passo").forEach((p) => p.classList.toggle("ativo", p.dataset.passo === nome));
     salvarDraft();
+    atualizarMarcasUI();
 
     if (nome === "escolha") renderEscolha();
     if (nome === "servicos") renderServicos();
@@ -392,8 +676,17 @@
         const b = Store.getBarbeiro(booking.barbeiroId);
         chip.classList.remove("oculto");
         $("#chip-barbeiro-nome").textContent = b?.nome || "—";
-        $("#chip-barbeiro-iniciais").textContent = b?.iniciais || "?";
-        $("#chip-barbeiro-iniciais").style.background = b?.cor || "#333";
+        const av = $("#chip-barbeiro-iniciais");
+        if (av) {
+          if (b?.fotoData) {
+            av.classList.add("avatar-foto");
+            av.innerHTML = `<img src="${b.fotoData}" alt="" />`;
+          } else {
+            av.classList.remove("avatar-foto");
+            av.textContent = b?.iniciais || "?";
+          }
+          av.style.background = b?.cor || "#333";
+        }
       } else {
         chip.classList.add("oculto");
       }
@@ -410,7 +703,7 @@
         const on = Number(booking.barbeiroId) === Number(b.id);
         return `
           <button type="button" class="card-pick-barbeiro ${on ? "selecionado" : ""}" data-id="${b.id}">
-            <div class="avatar" style="background:${b.cor}">${b.iniciais}</div>
+            ${avatarHtml(b)}
             <strong>${b.nome}</strong>
             ${on ? '<span class="pick-check">✓</span>' : ""}
           </button>`;
@@ -534,8 +827,6 @@
         </button>`;
     }
 
-    /* Sem preferência: agrega horários livres de todos os profissionais.
-       O servidor sorteia o profissional na confirmação (dono pode remanejar). */
     if (booking.path === "servico" && booking.semPreferencia) {
       const horas = new Set();
       for (const b of Store.getBarbeiros()) {
@@ -544,7 +835,7 @@
             horas.add(h)
           );
         } catch {
-          /* ignora barbeiro com erro */
+          /* ignora */
         }
       }
       const ordenadas = [...horas].sort();
@@ -610,7 +901,7 @@
       html += `
         <div class="card-barbeiro">
           <div class="card-barbeiro-topo">
-            <div class="avatar" style="background:${b.cor}">${b.iniciais}</div>
+            ${avatarHtml(b)}
             <strong>${b.nome}</strong>
           </div>
           <div class="grade-slots">${slotsHtml}</div>
@@ -679,8 +970,17 @@
       : barb?.nome || "—";
     $("#conf-servico").textContent = serv?.nome || "—";
     $("#conf-horario").textContent = `${booking.hora} até ${fim}`;
-    $("#conf-avatar").textContent = semPref ? "★" : barb?.iniciais || "?";
-    $("#conf-avatar").style.background = semPref ? "#555" : barb?.cor || "#333";
+    const av = $("#conf-avatar");
+    if (av) {
+      if (!semPref && barb?.fotoData) {
+        av.classList.add("avatar-foto");
+        av.innerHTML = `<img src="${barb.fotoData}" alt="" />`;
+      } else {
+        av.classList.remove("avatar-foto");
+        av.textContent = semPref ? "★" : barb?.iniciais || "?";
+      }
+      av.style.background = semPref ? "#555" : barb?.cor || "#333";
+    }
     $("#conf-politica").textContent = B().politicaCancelamento.texto;
     $("#conf-obs").value = booking.observacao || "";
 
@@ -693,6 +993,13 @@
   async function confirmarAgendamento() {
     if (!Store.temAuthReal()) {
       toast("Faça login (e-mail ou Google) para confirmar o agendamento");
+      irParaLogin();
+      return;
+    }
+
+    const slug = Store.getSlug();
+    if (!slug) {
+      toast("Loja não definida");
       return;
     }
 
@@ -711,6 +1018,7 @@
 
     try {
       const res = await API.post("/api/agendamentos", {
+        slug,
         barbeiroId: booking.semPreferencia ? null : booking.barbeiroId,
         servicoId: booking.servicoId,
         data: booking.data,
@@ -774,6 +1082,7 @@
     if (painelSecao === "barbeiros") renderPainelBarbeiros();
     if (painelSecao === "servicos") renderPainelServicos();
     if (painelSecao === "bloqueios") renderPainelBloqueios();
+    if (painelSecao === "loja") renderPainelLoja();
   }
 
   function renderPainelNav() {
@@ -781,8 +1090,6 @@
       b.classList.toggle("ativo", b.dataset.secao === painelSecao)
     );
   }
-
-  /* ---------- painel: resumo / dashboard ---------- */
 
   const brl = (v) =>
     Number(v || 0).toLocaleString("pt-BR", {
@@ -797,7 +1104,7 @@
 
     if (resumoPeriodo === "semana") {
       const ini = new Date(hoje);
-      const diaSemana = (ini.getDay() + 6) % 7; // segunda = 0
+      const diaSemana = (ini.getDay() + 6) % 7;
       ini.setDate(ini.getDate() - diaSemana);
       const fim = new Date(ini);
       fim.setDate(fim.getDate() + 6);
@@ -834,6 +1141,7 @@
         <label>Até<input type="date" id="resumo-ate" value="${fim}" /></label>
         <button type="button" id="btn-resumo-aplicar">Aplicar</button>
       </div>
+      <button type="button" class="btn-assinatura-painel" id="btn-assinatura-resumo">✦ Assinar Encaixe Solo R$ 49,90</button>
       <div id="resumo-dados"><p class="carregando-slots">Carregando…</p></div>`;
 
     $$(".chip-periodo", box).forEach((b) => {
@@ -852,6 +1160,8 @@
       resumoFim = ate;
       carregarResumo();
     });
+
+    $("#btn-assinatura-resumo", box)?.addEventListener("click", iniciarCheckoutAssinatura);
 
     carregarResumo();
   }
@@ -927,7 +1237,7 @@
         const pct = Math.round(((Number(b.faturamento) || 0) / teto) * 100);
         return `
         <article class="card-barbeiro-perf">
-          <div class="avatar" style="background:${b.cor}">${b.iniciais}</div>
+          ${avatarHtml(b)}
           <div class="perf-info">
             <div class="perf-topo">
               <strong>${b.nome}</strong>
@@ -1130,7 +1440,7 @@
           .map(
             (b) => `
           <article class="card-painel-item" data-id="${b.id}">
-            <div class="avatar" style="background:${b.cor}">${b.iniciais}</div>
+            ${avatarHtml(b)}
             <div class="card-painel-item-info">
               <strong>${b.nome}</strong>
               <span class="${b.ativo ? "tag-ativo" : "tag-inativo"}">${b.ativo ? "Ativo" : "Inativo"}</span>
@@ -1154,16 +1464,38 @@
   function mostrarFormBarbeiro(b) {
     const form = $("#form-barbeiro");
     form.classList.remove("oculto");
+    let fotoData = b?.fotoData || null;
     form.innerHTML = `
       <h4>${b ? "Editar barbeiro" : "Novo barbeiro"}</h4>
       <label>Nome<input type="text" id="fb-nome" value="${b?.nome || ""}" /></label>
       <label>Iniciais<input type="text" id="fb-iniciais" maxlength="4" value="${b?.iniciais || ""}" /></label>
       <label>Cor<input type="color" id="fb-cor" value="${b?.cor || "#3d3d3d"}" /></label>
+      <label>Foto
+        <input type="file" id="fb-foto" accept="image/*" />
+        <div id="fb-foto-preview" class="foto-preview ${fotoData ? "" : "oculto"}">
+          ${fotoData ? `<img src="${fotoData}" alt="" />` : ""}
+        </div>
+      </label>
       <label class="check-label"><input type="checkbox" id="fb-ativo" ${b?.ativo !== false ? "checked" : ""} /> Ativo</label>
       <div class="form-painel-acoes">
         <button type="button" class="btn btn-outline" id="fb-cancelar">Cancelar</button>
         <button type="button" class="btn btn-solid" id="fb-salvar">Salvar</button>
       </div>`;
+
+    $("#fb-foto")?.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        fotoData = await U().comprimirImagem(file, 400, 0.7);
+        const prev = $("#fb-foto-preview");
+        if (prev) {
+          prev.classList.remove("oculto");
+          prev.innerHTML = `<img src="${fotoData}" alt="" />`;
+        }
+      } catch {
+        toast("Não foi possível processar a foto");
+      }
+    });
 
     $("#fb-cancelar")?.addEventListener("click", () => form.classList.add("oculto"));
     $("#fb-salvar")?.addEventListener("click", async () => {
@@ -1172,6 +1504,7 @@
         iniciais: $("#fb-iniciais").value.trim(),
         cor: $("#fb-cor").value,
         ativo: $("#fb-ativo").checked,
+        fotoData: fotoData,
       };
       if (!body.nome) {
         toast("Informe o nome");
@@ -1180,7 +1513,7 @@
       try {
         if (b) await Store.donoAtualizarBarbeiro(b.id, body);
         else await Store.donoCriarBarbeiro(body);
-        await Store.syncCatalogo();
+        await Store.syncCatalogo().catch(() => {});
         toast("Barbeiro salvo");
         renderPainelBarbeiros();
       } catch (e) {
@@ -1251,7 +1584,7 @@
       try {
         if (s) await Store.donoAtualizarServico(s.id, body);
         else await Store.donoCriarServico(body);
-        await Store.syncCatalogo();
+        await Store.syncCatalogo().catch(() => {});
         toast("Serviço salvo");
         renderPainelServicos();
       } catch (e) {
@@ -1260,9 +1593,203 @@
     });
   }
 
+  /* ---------- loja settings ---------- */
+
+  async function renderPainelLoja() {
+    const box = $("#painel-conteudo");
+    box.innerHTML = `<p class="carregando-slots">Carregando…</p>`;
+    try {
+      const loja = await Store.donoLoja();
+      let logoData = loja.logoData || null;
+      box.innerHTML = `
+        <div class="form-painel form-loja">
+          <h4>Dados da loja</h4>
+          <label>Nome
+            <input type="text" id="fl-nome" value="${loja.nome || ""}" maxlength="120" />
+          </label>
+          <label>Telefone
+            <input type="tel" id="fl-telefone" value="${loja.telefone || ""}" maxlength="30" />
+          </label>
+          <label>Link público
+            <input type="text" value="#/loja/${loja.slug || ""}" readonly />
+          </label>
+          <label>Logo
+            <input type="file" id="fl-logo" accept="image/*" />
+            <div id="fl-logo-preview" class="foto-preview ${logoData ? "" : "oculto"}">
+              ${logoData ? `<img src="${logoData}" alt="" />` : ""}
+            </div>
+          </label>
+          <p class="resumo-nota">Plano: ${loja.plano || "—"} · Assinatura: ${loja.statusAssinatura || "—"}</p>
+          <div class="form-painel-acoes">
+            <button type="button" class="btn btn-solid" id="fl-salvar">Salvar loja</button>
+          </div>
+        </div>`;
+
+      $("#fl-logo")?.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+          logoData = await U().comprimirImagem(file, 400, 0.7);
+          const prev = $("#fl-logo-preview");
+          if (prev) {
+            prev.classList.remove("oculto");
+            prev.innerHTML = `<img src="${logoData}" alt="" />`;
+          }
+        } catch {
+          toast("Não foi possível processar o logo");
+        }
+      });
+
+      $("#fl-salvar")?.addEventListener("click", async () => {
+        const nome = $("#fl-nome").value.trim();
+        if (!nome) return toast("Informe o nome");
+        try {
+          await Store.donoAtualizarLoja({
+            nome,
+            telefone: $("#fl-telefone").value.trim(),
+            logoData,
+          });
+          atualizarMarcasUI();
+          toast("Loja atualizada");
+        } catch (e) {
+          toast(e.message || "Erro ao salvar");
+        }
+      });
+    } catch (e) {
+      box.innerHTML = `<p class="lista-vazia erro">${e.message || "Erro"}</p>`;
+    }
+  }
+
+  /* ---------- bloqueios: draft local + sync no salvar ---------- */
+
+  function draftKeyBloqueios() {
+    const dataIso = U().toISODate(bloqueioDataSel);
+    return `encaixe_bl_${Store.getSlug()}_${bloqueioBarbeiroId}_${dataIso}`;
+  }
+
+  function salvarDraftBloqueiosLocal() {
+    try {
+      localStorage.setItem(
+        draftKeyBloqueios(),
+        JSON.stringify({
+          horas: [...bloqueiosDraftSet],
+          dirty: bloqueiosDirty,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function lerDraftBloqueiosLocal() {
+    try {
+      const raw = localStorage.getItem(draftKeyBloqueios());
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function limparDraftBloqueiosLocal() {
+    try {
+      localStorage.removeItem(draftKeyBloqueios());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function isBloqueiosDirty() {
+    const serverHoras = new Set([...bloqueiosServerMap.keys()]);
+    if (serverHoras.size !== bloqueiosDraftSet.size) return true;
+    for (const h of bloqueiosDraftSet) {
+      if (!serverHoras.has(h)) return true;
+    }
+    return false;
+  }
+
+  function atualizarBarraSalvarBloqueios() {
+    let bar = $("#barra-salvar-bloqueios");
+    bloqueiosDirty = isBloqueiosDirty();
+    if (!bloqueiosDirty) {
+      bar?.remove();
+      salvarDraftBloqueiosLocal();
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "barra-salvar-bloqueios";
+      bar.className = "barra-salvar-bloqueios";
+      bar.innerHTML = `
+        <span>Alterações nos horários</span>
+        <button type="button" class="btn btn-solid" id="btn-salvar-bloqueios">Salvar horários</button>`;
+      document.body.appendChild(bar);
+      $("#btn-salvar-bloqueios")?.addEventListener("click", salvarBloqueiosSync);
+    }
+    salvarDraftBloqueiosLocal();
+  }
+
+  async function salvarBloqueiosSync() {
+    const btn = $("#btn-salvar-bloqueios");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Salvando…";
+    }
+    const dataIso = U().toISODate(bloqueioDataSel);
+    const criar = [];
+    const removerIds = [];
+
+    bloqueiosDraftSet.forEach((hora) => {
+      if (!bloqueiosServerMap.has(hora)) {
+        criar.push({
+          hora: hora.length === 5 ? hora + ":00" : hora,
+          motivo: "Bloqueado pelo profissional",
+        });
+      }
+    });
+    bloqueiosServerMap.forEach((bl, hora) => {
+      if (!bloqueiosDraftSet.has(hora) && bl.id != null) {
+        removerIds.push(Number(bl.id));
+      }
+    });
+
+    try {
+      const lista = await Store.donoSyncBloqueios({
+        data: dataIso,
+        barbeiroId: Number(bloqueioBarbeiroId),
+        bloqueios: criar,
+        removerIds,
+      });
+      bloqueiosServerMap = new Map();
+      (lista || [])
+        .filter(
+          (bl) =>
+            bl.barbeiroId == null ||
+            Number(bl.barbeiroId) === Number(bloqueioBarbeiroId)
+        )
+        .forEach((bl) => {
+          const h = String(bl.hora).slice(0, 5);
+          bloqueiosServerMap.set(h, bl);
+        });
+      bloqueiosDraftSet = new Set(bloqueiosServerMap.keys());
+      bloqueiosDirty = false;
+      limparDraftBloqueiosLocal();
+      $("#barra-salvar-bloqueios")?.remove();
+      toast("Horários salvos");
+      renderGradeBloqueioSlots();
+    } catch (e) {
+      toast(e.message || "Erro ao salvar");
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Salvar horários";
+      }
+    }
+  }
+
   async function renderPainelBloqueios() {
     const box = $("#painel-conteudo");
     box.innerHTML = `<p class="carregando-slots">Carregando…</p>`;
+    $("#barra-salvar-bloqueios")?.remove();
 
     if (!bloqueioBarbeiroId) {
       await renderBloqueioEscolherBarbeiro(box);
@@ -1276,13 +1803,13 @@
       const lista = await Store.donoBarbeiros();
       const ativos = lista.filter((b) => b.ativo !== false);
       box.innerHTML = `
-        <p class="bloqueio-dica">Escolha o profissional para liberar ou bloquear horários. Toque no horário — vermelho = indisponível para o cliente.</p>
+        <p class="bloqueio-dica">Escolha o profissional. Toque nos horários para marcar/desmarcar — salve quando terminar.</p>
         <div class="lista-barbeiros-bloqueio">
           ${ativos
             .map(
               (b) => `
             <button type="button" class="card-barbeiro-pick" data-id="${b.id}">
-              <div class="avatar" style="background:${b.cor}">${b.iniciais}</div>
+              ${avatarHtml(b)}
               <strong>${b.nome}</strong>
               <span>Gerenciar horários →</span>
             </button>`
@@ -1320,10 +1847,10 @@
     box.innerHTML = `
       <button type="button" class="btn-voltar-barbeiro" id="bl-voltar-barbeiro">← Trocar profissional</button>
       <div class="bloqueio-header-barb">
-        <div class="avatar" style="background:${barb.cor}">${barb.iniciais}</div>
+        ${avatarHtml(barb)}
         <div>
           <strong>${barb.nome}</strong>
-          <span>Toque no horário para bloquear / liberar</span>
+          <span>Toque para bloquear / liberar (salve depois)</span>
         </div>
       </div>
       <div class="cal-wrap bloqueio-cal">
@@ -1342,22 +1869,27 @@
       </div>`;
 
     $("#bl-voltar-barbeiro")?.addEventListener("click", () => {
+      if (bloqueiosDirty && !confirm("Há alterações não salvas. Descartar?")) return;
       bloqueioBarbeiroId = null;
+      $("#barra-salvar-bloqueios")?.remove();
       renderPainelBloqueios();
     });
     $("#bl-cal-prev")?.addEventListener("click", () => {
+      if (bloqueiosDirty && !confirm("Há alterações não salvas. Descartar?")) return;
       bloqueioDataSel = new Date(bloqueioDataSel);
       bloqueioDataSel.setDate(bloqueioDataSel.getDate() - 7);
       bloqueioCalCursor = new Date(bloqueioDataSel);
       renderPainelBloqueios();
     });
     $("#bl-cal-next")?.addEventListener("click", () => {
+      if (bloqueiosDirty && !confirm("Há alterações não salvas. Descartar?")) return;
       bloqueioDataSel = new Date(bloqueioDataSel);
       bloqueioDataSel.setDate(bloqueioDataSel.getDate() + 7);
       bloqueioCalCursor = new Date(bloqueioDataSel);
       renderPainelBloqueios();
     });
     $("#bl-cal-hoje")?.addEventListener("click", () => {
+      if (bloqueiosDirty && !confirm("Há alterações não salvas. Descartar?")) return;
       bloqueioDataSel = new Date();
       bloqueioCalCursor = new Date();
       renderPainelBloqueios();
@@ -1401,6 +1933,7 @@
       btn.disabled = !funciona;
       btn.innerHTML = `<span>${U().diaSemanaLetra(d)}</span><strong>${d.getDate()}</strong>`;
       btn.addEventListener("click", () => {
+        if (bloqueiosDirty && !confirm("Há alterações não salvas. Descartar?")) return;
         bloqueioDataSel = d;
         bloqueioCalCursor = new Date(d);
         renderBloqueioCalendario();
@@ -1415,19 +1948,35 @@
     if (!grade || !bloqueioBarbeiroId) return;
     const dataIso = U().toISODate(bloqueioDataSel);
     grade.innerHTML = `<p class="carregando-slots">Carregando…</p>`;
+    bloqueiosSlugDraftKey = draftKeyBloqueios();
 
     try {
       const [bloqueios, agendaDono] = await Promise.all([
         Store.donoBloqueios(dataIso),
         Store.donoAgendamentos(60, 0).catch(() => []),
       ]);
-      bloqueiosDoDia = bloqueios.filter(
-        (bl) =>
-          bl.barbeiroId == null ||
-          Number(bl.barbeiroId) === Number(bloqueioBarbeiroId)
-      );
 
-      const ocupados = new Set(
+      bloqueiosServerMap = new Map();
+      (bloqueios || [])
+        .filter(
+          (bl) =>
+            bl.barbeiroId == null ||
+            Number(bl.barbeiroId) === Number(bloqueioBarbeiroId)
+        )
+        .forEach((bl) => {
+          bloqueiosServerMap.set(String(bl.hora).slice(0, 5), bl);
+        });
+
+      const draftLocal = lerDraftBloqueiosLocal();
+      if (draftLocal?.dirty && Array.isArray(draftLocal.horas)) {
+        bloqueiosDraftSet = new Set(draftLocal.horas);
+        bloqueiosDirty = true;
+      } else {
+        bloqueiosDraftSet = new Set(bloqueiosServerMap.keys());
+        bloqueiosDirty = false;
+      }
+
+      bloqueiosOcupados = new Set(
         (agendaDono || [])
           .filter(
             (ag) =>
@@ -1437,64 +1986,79 @@
           .map((ag) => String(ag.hora).slice(0, 5))
       );
 
-      const mapaBloq = new Map();
-      bloqueiosDoDia.forEach((bl) => {
-        mapaBloq.set(String(bl.hora).slice(0, 5), bl);
-      });
-
-      const slots = U().gerarSlots();
-      grade.innerHTML = slots
-        .map((hora) => {
-          const bl = mapaBloq.get(hora);
-          const ocupado = ocupados.has(hora);
-          if (ocupado) {
-            return `<button type="button" class="slot slot-ocupado" disabled title="Já agendado">${hora}</button>`;
-          }
-          if (bl) {
-            return `<button type="button" class="slot slot-bloqueado" data-hora="${hora}" data-id="${bl.id}" title="Clique para liberar">${hora}</button>`;
-          }
-          return `<button type="button" class="slot slot-livre" data-hora="${hora}" title="Clique para bloquear">${hora}</button>`;
-        })
-        .join("");
-
-      $$(".slot-livre", grade).forEach((btn) => {
-        btn.addEventListener("click", () => toggleBloqueioSlot(btn.dataset.hora, null));
-      });
-      $$(".slot-bloqueado", grade).forEach((btn) => {
-        btn.addEventListener("click", () =>
-          toggleBloqueioSlot(btn.dataset.hora, btn.dataset.id)
-        );
-      });
+      renderGradeBloqueioSlots();
+      atualizarBarraSalvarBloqueios();
     } catch (e) {
       grade.innerHTML = `<p class="lista-vazia erro">${e.message || "Erro ao carregar"}</p>`;
     }
   }
 
-  async function toggleBloqueioSlot(hora, bloqueioId) {
-    const dataIso = U().toISODate(bloqueioDataSel);
+  function renderGradeBloqueioSlots() {
+    const grade = $("#bl-grade-slots");
+    if (!grade) return;
+    const slots = U().gerarSlots();
+    grade.innerHTML = slots
+      .map((hora) => {
+        const ocupado = bloqueiosOcupados.has(hora);
+        if (ocupado) {
+          return `<button type="button" class="slot slot-ocupado" disabled title="Já agendado">${hora}</button>`;
+        }
+        const bloq = bloqueiosDraftSet.has(hora);
+        if (bloq) {
+          return `<button type="button" class="slot slot-bloqueado" data-hora="${hora}" title="Clique para liberar">${hora}</button>`;
+        }
+        return `<button type="button" class="slot slot-livre" data-hora="${hora}" title="Clique para bloquear">${hora}</button>`;
+      })
+      .join("");
+
+    $$(".slot-livre, .slot-bloqueado", grade).forEach((btn) => {
+      btn.addEventListener("click", () => toggleBloqueioSlotLocal(btn.dataset.hora));
+    });
+  }
+
+  function toggleBloqueioSlotLocal(hora) {
+    if (bloqueiosDraftSet.has(hora)) bloqueiosDraftSet.delete(hora);
+    else bloqueiosDraftSet.add(hora);
+    renderGradeBloqueioSlots();
+    atualizarBarraSalvarBloqueios();
+  }
+
+  /* ---------- assinatura ---------- */
+
+  async function iniciarCheckoutAssinatura() {
     try {
-      if (bloqueioId) {
-        await Store.donoRemoverBloqueio(bloqueioId, {
-          barbeiroId: Number(bloqueioBarbeiroId),
-          data: dataIso,
-        });
-        toast(`${hora} liberado`);
-      } else {
-        await Store.donoCriarBloqueio({
-          data: dataIso,
-          hora: hora.length === 5 ? hora + ":00" : hora,
-          barbeiroId: Number(bloqueioBarbeiroId),
-          motivo: "Bloqueado pelo profissional",
-        });
-        toast(`${hora} bloqueado`);
+      toast("Abrindo checkout…");
+      const res = await Store.donoCheckoutAssinatura();
+      const url = res.initPoint || res.init_point || res.sandboxInitPoint;
+      if (!url) {
+        toast("Checkout indisponível no momento");
+        return;
       }
-      await carregarBloqueioSlots();
+      window.open(url, "_blank", "noopener");
     } catch (e) {
-      toast(e.message || "Erro");
+      toast(e.message || "Erro ao iniciar assinatura");
     }
   }
 
   /* ---------- Google Sign-In ---------- */
+
+  async function aposAuth(usuario) {
+    toast("Bem-vindo!");
+    if (usuario.papel === "DONO") {
+      if (usuario.slug) Store.setLoja(usuario.slug);
+      setHash("/");
+      await entrarApp({ modo: "dono", tab: "painel" });
+      return;
+    }
+    if (Store.getSlug() || rotaAtual.slug) {
+      const slug = Store.getSlug() || rotaAtual.slug;
+      setHash(`/loja/${slug}`);
+      await entrarApp({ modo: "loja" });
+      return;
+    }
+    setHash("/");
+    mostrarEntry();
+  }
 
   async function handleGoogleCredential(response) {
     try {
@@ -1502,9 +2066,8 @@
         toast("Login Google cancelado");
         return;
       }
-      await Store.loginGoogle(response.credential);
-      toast("Bem-vindo!");
-      await entrarApp();
+      const usuario = await Store.loginGoogle(response.credential);
+      await aposAuth(usuario);
     } catch (err) {
       toast(err.message || "Erro no login Google");
     }
@@ -1547,9 +2110,95 @@
     montarBotaoGoogle();
   }
 
+  /* ---------- criar loja / slug preview ---------- */
+
+  function atualizarSlugPreview() {
+    const nome = $("#cl-barbearia")?.value || "";
+    const manual = $("#cl-slug")?.value?.trim();
+    const slug = slugAutoEditado ? U().slugify(nome) : U().slugify(manual || nome);
+    if (slugAutoEditado && $("#cl-slug")) {
+      $("#cl-slug").value = slug;
+    }
+    const prev = $("#cl-slug-preview");
+    if (prev) prev.textContent = slug || "—";
+  }
+
   /* ---------- boot ---------- */
 
   function bind() {
+    $("#btn-entry-entrar")?.addEventListener("click", () => {
+      setHash("/login");
+    });
+    $("#btn-entry-criar")?.addEventListener("click", () => {
+      setHash("/criar-loja");
+    });
+    $("#btn-entry-ir")?.addEventListener("click", () => {
+      const slug = $("#entry-slug")?.value?.trim();
+      entrarLoja(slug);
+    });
+    $("#entry-slug")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        entrarLoja($("#entry-slug").value.trim());
+      }
+    });
+    $("#btn-entry-demo")?.addEventListener("click", () => entrarLoja("demo"));
+
+    $("#btn-criar-voltar")?.addEventListener("click", () => setHash("/"));
+    $("#btn-login-voltar")?.addEventListener("click", () => setHash("/"));
+
+    $("#cl-barbearia")?.addEventListener("input", () => {
+      if (slugAutoEditado) atualizarSlugPreview();
+    });
+    $("#cl-slug")?.addEventListener("input", () => {
+      slugAutoEditado = false;
+      atualizarSlugPreview();
+    });
+
+    $("#form-criar-loja")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nome = $("#cl-nome").value.trim();
+      const email = $("#cl-email").value.trim();
+      const senha = $("#cl-senha").value;
+      const nomeBarbearia = $("#cl-barbearia").value.trim();
+      const slug = U().slugify($("#cl-slug").value.trim() || nomeBarbearia);
+      const telefone = $("#cl-telefone").value.trim();
+      if (!nome || !email || !senha || !nomeBarbearia) {
+        toast("Preencha os campos obrigatórios");
+        return;
+      }
+      if (senha.length < 6) {
+        toast("Senha deve ter no mínimo 6 caracteres");
+        return;
+      }
+      const btn = $("#btn-criar-submit");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Criando…";
+      }
+      try {
+        const usuario = await Store.criarLoja({
+          nome,
+          email,
+          senha,
+          nomeBarbearia,
+          slug,
+          telefone,
+        });
+        toast("Barbearia criada!");
+        setHash("/");
+        await entrarApp({ modo: "dono", tab: "painel" });
+        void usuario;
+      } catch (err) {
+        toast(err.message || "Erro ao criar loja");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Criar e entrar";
+        }
+      }
+    });
+
     $("#form-login")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = $("#login-email").value.trim();
@@ -1559,9 +2208,8 @@
         return;
       }
       try {
-        await Store.loginApi(email, senha);
-        toast("Bem-vindo!");
-        await entrarApp();
+        const usuario = await Store.loginApi(email, senha);
+        await aposAuth(usuario);
       } catch (err) {
         toast(err.message || "Erro no login");
       }
@@ -1577,9 +2225,8 @@
         return;
       }
       try {
-        await Store.cadastroApi(nome, email, senha);
-        toast("Conta criada!");
-        await entrarApp();
+        const usuario = await Store.cadastroApi(nome, email, senha);
+        await aposAuth(usuario);
       } catch (err) {
         toast(err.message || "Erro no cadastro");
       }
@@ -1587,18 +2234,6 @@
 
     $("#btn-auth-cadastro")?.addEventListener("click", () => alternarModoAuth(true));
     $("#btn-auth-login")?.addEventListener("click", () => alternarModoAuth(false));
-
-    $("#btn-login-demo")?.addEventListener("click", async () => {
-      try {
-        await Store.loginApi("dono@barberini.com", "dono123");
-        toast("Entrou como dono (demo API)");
-        await entrarApp();
-      } catch {
-        Store.loginDemo("Cliente Demo", "demo@local");
-        toast("Modo demo — login real necessário para agendar");
-        await entrarApp();
-      }
-    });
 
     $$(".tab").forEach((t) =>
       t.addEventListener("click", () => ativarTab(t.dataset.tab))
@@ -1658,11 +2293,16 @@
     $("#btn-sair")?.addEventListener("click", () => {
       if (confirm("Deseja sair?")) {
         Store.logout();
-        irParaLogin();
+        limparLembretes();
+        $("#barra-salvar-bloqueios")?.remove();
+        setHash("/");
+        mostrarEntry();
+        initGoogleSignIn();
       }
     });
 
     $("#btn-painel-opcoes")?.addEventListener("click", () => ativarTab("painel"));
+    $("#btn-assinatura")?.addEventListener("click", iniciarCheckoutAssinatura);
     $("#btn-relatar")?.addEventListener("click", () => {
       toast("Obrigado! Em breve abriremos o canal de suporte.");
     });
@@ -1678,33 +2318,30 @@
       booking.observacao = e.target.value;
       salvarDraft();
     });
+
+    window.addEventListener("hashchange", () => {
+      onHashChange();
+    });
   }
 
   async function init() {
     bind();
     restaurarDraft();
-
-    const token = API.token();
-    const u = usuarioLogado();
-    if (token && u && !u.demo) {
-      await entrarApp();
-    } else if (u) {
-      await entrarApp();
-    } else {
-      irParaLogin();
-    }
-
     initGoogleSignIn();
+    await onHashChange();
 
     const splash = $("#splash");
     if (splash) {
-      const reduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setTimeout(() => {
         splash.classList.add("splash-sair");
         setTimeout(() => splash.remove(), 420);
-      }, reduzido ? 300 : 1600);
+      }, 900);
     }
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();

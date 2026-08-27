@@ -1,6 +1,7 @@
 package br.com.barberini.controller;
 
 import br.com.barberini.dto.CadastroRequest;
+import br.com.barberini.dto.CriarLojaRequest;
 import br.com.barberini.dto.GoogleLoginRequest;
 import br.com.barberini.dto.LoginRequest;
 import br.com.barberini.service.AuthService;
@@ -22,6 +23,11 @@ public class AuthController {
     @PostMapping("/cadastro")
     public Map<String, Object> cadastrar(@Valid @RequestBody CadastroRequest request) {
         return authService.cadastrar(request);
+    }
+
+    @PostMapping("/criar-loja")
+    public Map<String, Object> criarLoja(@Valid @RequestBody CriarLojaRequest request) {
+        return authService.cadastrarDono(request);
     }
 
     @PostMapping("/login")

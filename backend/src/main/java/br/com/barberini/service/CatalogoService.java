@@ -2,13 +2,16 @@ package br.com.barberini.service;
 
 import br.com.barberini.dto.BarbeiroRequest;
 import br.com.barberini.dto.BloqueioRequest;
+import br.com.barberini.dto.SyncBloqueiosRequest;
 import br.com.barberini.dto.ServicoRequest;
+import br.com.barberini.model.Barbearia;
 import br.com.barberini.model.Barbeiro;
 import br.com.barberini.model.BloqueioHorario;
 import br.com.barberini.model.Servico;
 import br.com.barberini.repository.BarbeiroRepository;
 import br.com.barberini.repository.BloqueioHorarioRepository;
 import br.com.barberini.repository.ServicoRepository;
+import br.com.barberini.security.TenantSupport;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,44 +27,70 @@ public class CatalogoService {
     private final BarbeiroRepository barbeiros;
     private final ServicoRepository servicos;
     private final BloqueioHorarioRepository bloqueios;
+    private final TenantSupport tenant;
 
-    public CatalogoService(BarbeiroRepository barbeiros, ServicoRepository servicos, BloqueioHorarioRepository bloqueios) {
+    public CatalogoService(
+            BarbeiroRepository barbeiros,
+            ServicoRepository servicos,
+            BloqueioHorarioRepository bloqueios,
+            TenantSupport tenant) {
         this.barbeiros = barbeiros;
         this.servicos = servicos;
         this.bloqueios = bloqueios;
+        this.tenant = tenant;
     }
 
     public List<Map<String, Object>> listarBarbeiros(boolean soAtivos) {
-        List<Barbeiro> lista = soAtivos ? barbeiros.findByAtivoTrueOrderByNomeAsc() : barbeiros.findAllByOrderByNomeAsc();
+        Long lojaId = tenant.exigirDonoComLoja().getId();
+        return listarBarbeirosDaLoja(lojaId, soAtivos);
+    }
+
+    public List<Map<String, Object>> listarBarbeirosDaLoja(Long barbeariaId, boolean soAtivos) {
+        List<Barbeiro> lista = soAtivos
+                ? barbeiros.findByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbeariaId)
+                : barbeiros.findByBarbeariaIdOrderByNomeAsc(barbeariaId);
         return lista.stream().map(this::mapBarbeiro).toList();
     }
 
     public Map<String, Object> criarBarbeiro(BarbeiroRequest req) {
+        Barbearia loja = tenant.exigirDonoComLoja();
         Barbeiro b = new Barbeiro();
+        b.setBarbearia(loja);
         aplicarBarbeiro(b, req);
         return mapBarbeiro(barbeiros.save(b));
     }
 
     public Map<String, Object> atualizarBarbeiro(Long id, BarbeiroRequest req) {
-        Barbeiro b = barbeiros.findById(id)
+        Barbearia loja = tenant.exigirDonoComLoja();
+        Barbeiro b = barbeiros.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro não encontrado"));
         aplicarBarbeiro(b, req);
         return mapBarbeiro(barbeiros.save(b));
     }
 
     public List<Map<String, Object>> listarServicos(boolean soAtivos) {
-        List<Servico> lista = soAtivos ? servicos.findByAtivoTrueOrderByNomeAsc() : servicos.findAllByOrderByNomeAsc();
+        Long lojaId = tenant.exigirDonoComLoja().getId();
+        return listarServicosDaLoja(lojaId, soAtivos);
+    }
+
+    public List<Map<String, Object>> listarServicosDaLoja(Long barbeariaId, boolean soAtivos) {
+        List<Servico> lista = soAtivos
+                ? servicos.findByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbeariaId)
+                : servicos.findByBarbeariaIdOrderByNomeAsc(barbeariaId);
         return lista.stream().map(this::mapServico).toList();
     }
 
     public Map<String, Object> criarServico(ServicoRequest req) {
+        Barbearia loja = tenant.exigirDonoComLoja();
         Servico s = new Servico();
+        s.setBarbearia(loja);
         aplicarServico(s, req);
         return mapServico(servicos.save(s));
     }
 
     public Map<String, Object> atualizarServico(Long id, ServicoRequest req) {
-        Servico s = servicos.findById(id)
+        Barbearia loja = tenant.exigirDonoComLoja();
+        Servico s = servicos.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço não encontrado"));
         aplicarServico(s, req);
         return mapServico(servicos.save(s));
@@ -69,29 +98,68 @@ public class CatalogoService {
 
     @Transactional
     public Map<String, Object> criarBloqueio(BloqueioRequest req) {
+        Barbearia loja = tenant.exigirDonoComLoja();
         BloqueioHorario b = new BloqueioHorario();
+        b.setBarbearia(loja);
         b.setData(req.data());
         b.setHora(req.hora());
         b.setMotivo(req.motivo());
         if (req.barbeiroId() != null) {
-            Barbeiro barb = barbeiros.findById(req.barbeiroId())
+            Barbeiro barb = barbeiros.findByIdAndBarbeariaId(req.barbeiroId(), loja.getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro não encontrado"));
             b.setBarbeiro(barb);
         }
-        BloqueioHorario salvo = bloqueios.save(b);
-        return mapBloqueio(salvo);
+        return mapBloqueio(bloqueios.save(b));
     }
 
     public void removerBloqueio(Long id) {
-        if (!bloqueios.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Bloqueio não encontrado");
-        }
-        bloqueios.deleteById(id);
+        Barbearia loja = tenant.exigirDonoComLoja();
+        BloqueioHorario b = bloqueios.findByIdAndBarbeariaId(id, loja.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bloqueio não encontrado"));
+        bloqueios.delete(b);
     }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listarBloqueios(java.time.LocalDate data) {
-        return bloqueios.findByData(data).stream().map(this::mapBloqueio).toList();
+        Long lojaId = tenant.exigirDonoComLoja().getId();
+        return listarBloqueiosDaLoja(lojaId, data);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listarBloqueiosDaLoja(Long barbeariaId, java.time.LocalDate data) {
+        return bloqueios.findByBarbeariaIdAndData(barbeariaId, data).stream().map(this::mapBloqueio).toList();
+    }
+
+    @Transactional
+    public List<Map<String, Object>> syncBloqueios(SyncBloqueiosRequest req) {
+        Barbearia loja = tenant.exigirDonoComLoja();
+        Long lojaId = loja.getId();
+
+        if (req.removerIds() != null) {
+            for (Long id : req.removerIds()) {
+                if (id == null) continue;
+                bloqueios.findByIdAndBarbeariaId(id, lojaId).ifPresent(bloqueios::delete);
+            }
+        }
+
+        Barbeiro barbeiro = null;
+        if (req.barbeiroId() != null) {
+            barbeiro = barbeiros.findByIdAndBarbeariaId(req.barbeiroId(), lojaId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro não encontrado"));
+        }
+
+        if (req.bloqueios() != null) {
+            for (SyncBloqueiosRequest.BloqueioItem item : req.bloqueios()) {
+                BloqueioHorario b = new BloqueioHorario();
+                b.setBarbearia(loja);
+                b.setData(req.data());
+                b.setHora(item.hora());
+                b.setMotivo(item.motivo());
+                b.setBarbeiro(barbeiro);
+                bloqueios.save(b);
+            }
+        }
+        return listarBloqueiosDaLoja(lojaId, req.data());
     }
 
     private void aplicarBarbeiro(Barbeiro b, BarbeiroRequest req) {
@@ -102,6 +170,9 @@ public class CatalogoService {
         b.setIniciais(ini.substring(0, Math.min(4, ini.length())));
         b.setCor(req.cor() != null && !req.cor().isBlank() ? req.cor() : "#3d3d3d");
         if (req.ativo() != null) b.setAtivo(req.ativo());
+        if (req.fotoData() != null) {
+            b.setFotoData(req.fotoData().isBlank() ? null : req.fotoData());
+        }
     }
 
     private void aplicarServico(Servico s, ServicoRequest req) {
@@ -124,6 +195,7 @@ public class CatalogoService {
         m.put("iniciais", b.getIniciais());
         m.put("cor", b.getCor());
         m.put("ativo", b.isAtivo());
+        m.put("fotoData", b.getFotoData());
         return m;
     }
 

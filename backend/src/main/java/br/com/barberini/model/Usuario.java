@@ -22,8 +22,16 @@ public class Usuario {
     private String senhaHash;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "varchar(20)")
     private Papel papel = Papel.CLIENTE;
+
+    /** Loja do dono. Clientes ficam null (podem agendar em várias lojas). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "barbearia_id")
+    private Barbearia barbearia;
+
+    @Column(length = 30)
+    private String telefone;
 
     @Column(nullable = false)
     private LocalDateTime criadoEm = LocalDateTime.now();
@@ -47,6 +55,10 @@ public class Usuario {
     public void setSenhaHash(String senhaHash) { this.senhaHash = senhaHash; }
     public Papel getPapel() { return papel; }
     public void setPapel(Papel papel) { this.papel = papel; }
+    public Barbearia getBarbearia() { return barbearia; }
+    public void setBarbearia(Barbearia barbearia) { this.barbearia = barbearia; }
+    public String getTelefone() { return telefone; }
+    public void setTelefone(String telefone) { this.telefone = telefone; }
     public LocalDateTime getCriadoEm() { return criadoEm; }
     public void setCriadoEm(LocalDateTime criadoEm) { this.criadoEm = criadoEm; }
 }

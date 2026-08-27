@@ -42,10 +42,13 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
             join fetch a.cliente
             join fetch a.barbeiro
             join fetch a.servico
-            where a.data between :inicio and :fim and a.status <> :statusExcluido
+            where a.barbearia.id = :barbeariaId
+              and a.data between :inicio and :fim
+              and a.status <> :statusExcluido
             order by a.data asc, a.horaInicio asc
             """)
-    List<Agendamento> findPeriodoExcluindoStatus(
+    List<Agendamento> findByBarbeariaIdAndPeriodoExcluindoStatus(
+            @Param("barbeariaId") Long barbeariaId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim,
             @Param("statusExcluido") StatusAgendamento statusExcluido);
@@ -55,19 +58,24 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
             join fetch a.cliente
             join fetch a.barbeiro
             join fetch a.servico
-            where a.data between :inicio and :fim
+            where a.barbearia.id = :barbeariaId and a.data between :inicio and :fim
             order by a.data asc, a.horaInicio asc
             """)
-    List<Agendamento> findPeriodo(
+    List<Agendamento> findByBarbeariaIdAndPeriodo(
+            @Param("barbeariaId") Long barbeariaId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
 
     /** Clientes que já tinham histórico antes do período — para separar novos de recorrentes */
     @Query("""
             select distinct a.cliente.id from Agendamento a
-            where a.cliente.id in :clienteIds and a.data < :inicio and a.status <> :statusExcluido
+            where a.barbearia.id = :barbeariaId
+              and a.cliente.id in :clienteIds
+              and a.data < :inicio
+              and a.status <> :statusExcluido
             """)
-    List<Long> clientesComHistoricoAntes(
+    List<Long> clientesComHistoricoAntesNaLoja(
+            @Param("barbeariaId") Long barbeariaId,
             @Param("clienteIds") List<Long> clienteIds,
             @Param("inicio") LocalDate inicio,
             @Param("statusExcluido") StatusAgendamento statusExcluido);
@@ -77,7 +85,10 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
             join fetch a.cliente
             join fetch a.barbeiro
             join fetch a.servico
+            join fetch a.barbearia
             where a.id = :id
             """)
     Optional<Agendamento> findByIdComDetalhes(@Param("id") Long id);
+
+    Optional<Agendamento> findByIdAndBarbeariaId(Long id, Long barbeariaId);
 }

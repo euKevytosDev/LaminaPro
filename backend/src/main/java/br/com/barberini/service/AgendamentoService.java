@@ -3,10 +3,12 @@ package br.com.barberini.service;
 import br.com.barberini.dto.CriarAgendamentoRequest;
 import br.com.barberini.model.*;
 import br.com.barberini.repository.AgendamentoRepository;
+import br.com.barberini.repository.BarbeariaRepository;
 import br.com.barberini.repository.BarbeiroRepository;
 import br.com.barberini.repository.ServicoRepository;
 import br.com.barberini.repository.UsuarioRepository;
 import br.com.barberini.security.AuthSupport;
+import br.com.barberini.security.TenantSupport;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,22 +27,28 @@ import java.util.concurrent.ThreadLocalRandom;
 public class AgendamentoService {
 
     private final AgendamentoRepository agendamentos;
+    private final BarbeariaRepository barbearias;
     private final BarbeiroRepository barbeiros;
     private final ServicoRepository servicos;
     private final UsuarioRepository usuarios;
     private final AgendaService agenda;
+    private final TenantSupport tenant;
 
     public AgendamentoService(
             AgendamentoRepository agendamentos,
+            BarbeariaRepository barbearias,
             BarbeiroRepository barbeiros,
             ServicoRepository servicos,
             UsuarioRepository usuarios,
-            AgendaService agenda) {
+            AgendaService agenda,
+            TenantSupport tenant) {
         this.agendamentos = agendamentos;
+        this.barbearias = barbearias;
         this.barbeiros = barbeiros;
         this.servicos = servicos;
         this.usuarios = usuarios;
         this.agenda = agenda;
+        this.tenant = tenant;
     }
 
     @Transactional
@@ -48,7 +56,12 @@ public class AgendamentoService {
         Long clienteId = AuthSupport.atual().getId();
         Usuario cliente = usuarios.findById(clienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuário inválido"));
-        Servico servico = servicos.findById(req.servicoId())
+
+        Barbearia loja = barbearias.findBySlugIgnoreCase(req.slug().trim())
+                .filter(Barbearia::isAtivo)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
+
+        Servico servico = servicos.findByIdAndBarbeariaId(req.servicoId(), loja.getId())
                 .filter(Servico::isAtivo)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Serviço indisponível"));
 
@@ -57,9 +70,9 @@ public class AgendamentoService {
 
         Barbeiro barbeiro;
         if (semPreferencia) {
-            barbeiro = sortearBarbeiroDisponivel(req.data(), horaStr, servico.getDuracaoMin());
+            barbeiro = sortearBarbeiroDisponivel(loja.getId(), req.data(), horaStr, servico.getDuracaoMin());
         } else {
-            barbeiro = barbeiros.findById(req.barbeiroId())
+            barbeiro = barbeiros.findByIdAndBarbeariaId(req.barbeiroId(), loja.getId())
                     .filter(Barbeiro::isAtivo)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro indisponível"));
             List<String> livres = agenda.slotsDisponiveis(barbeiro.getId(), req.data(), servico.getDuracaoMin());
@@ -70,6 +83,7 @@ public class AgendamentoService {
 
         LocalTime fim = agenda.calcularFim(req.horaInicio(), servico.getDuracaoMin());
         Agendamento a = new Agendamento();
+        a.setBarbearia(loja);
         a.setCliente(cliente);
         a.setBarbeiro(barbeiro);
         a.setServico(servico);
@@ -83,10 +97,10 @@ public class AgendamentoService {
         return map(agendamentos.save(a));
     }
 
-    /** Encaixe automático: entre os barbeiros livres no horário, escolhe um aleatório. */
-    private Barbeiro sortearBarbeiroDisponivel(LocalDate data, String horaStr, int duracaoMin) {
+    /** Encaixe automático: entre os barbeiros livres no horário da loja, escolhe um aleatório. */
+    private Barbeiro sortearBarbeiroDisponivel(Long barbeariaId, LocalDate data, String horaStr, int duracaoMin) {
         List<Barbeiro> candidatos = new ArrayList<>();
-        for (Barbeiro b : barbeiros.findByAtivoTrueOrderByNomeAsc()) {
+        for (Barbeiro b : barbeiros.findByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbeariaId)) {
             if (agenda.slotsDisponiveis(b.getId(), data, duracaoMin).contains(horaStr)) {
                 candidatos.add(b);
             }
@@ -99,13 +113,13 @@ public class AgendamentoService {
 
     @Transactional
     public Map<String, Object> reatribuirBarbeiro(Long id, Long novoBarbeiroId) {
-        AuthSupport.exigirDono();
-        Agendamento a = agendamentos.findById(id)
+        Barbearia loja = tenant.exigirDonoComLoja();
+        Agendamento a = agendamentos.findByIdAndBarbeariaId(id, loja.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento não encontrado"));
         if (a.getStatus() == StatusAgendamento.CANCELADO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Agendamento cancelado");
         }
-        Barbeiro novo = barbeiros.findById(novoBarbeiroId)
+        Barbeiro novo = barbeiros.findByIdAndBarbeariaId(novoBarbeiroId, loja.getId())
                 .filter(Barbeiro::isAtivo)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Barbeiro indisponível"));
 
@@ -137,10 +151,11 @@ public class AgendamentoService {
     /** Agenda do dono: inclui dias passados para que atendimentos em aberto possam ser fechados. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> todosProximos(int dias, int diasAtras) {
-        AuthSupport.exigirDono();
+        Barbearia loja = tenant.exigirDonoComLoja();
         LocalDate hoje = LocalDate.now();
         return agendamentos
-                .findPeriodoExcluindoStatus(
+                .findByBarbeariaIdAndPeriodoExcluindoStatus(
+                        loja.getId(),
                         hoje.minusDays(Math.max(0, diasAtras)),
                         hoje.plusDays(dias),
                         StatusAgendamento.CANCELADO)
@@ -152,11 +167,12 @@ public class AgendamentoService {
     /** Dono fecha o atendimento: finalizado (com valor opcional) ou não compareceu. */
     @Transactional
     public Map<String, Object> atualizarStatus(Long id, StatusAgendamento novoStatus, BigDecimal valorCobrado) {
-        AuthSupport.exigirDono();
+        Barbearia loja = tenant.exigirDonoComLoja();
         if (novoStatus == StatusAgendamento.CANCELADO) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use o cancelamento para cancelar");
         }
         Agendamento a = agendamentos.findByIdComDetalhes(id)
+                .filter(ag -> ag.getBarbearia().getId().equals(loja.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento não encontrado"));
         if (a.getStatus() == StatusAgendamento.CANCELADO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Agendamento cancelado");
@@ -174,10 +190,12 @@ public class AgendamentoService {
 
     @Transactional
     public void cancelar(Long id) {
-        Agendamento a = agendamentos.findById(id)
+        Agendamento a = agendamentos.findByIdComDetalhes(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento não encontrado"));
         var user = AuthSupport.atual();
-        boolean dono = user.isDono();
+        boolean dono = user.isDono()
+                && user.getBarbeariaId() != null
+                && user.getBarbeariaId().equals(a.getBarbearia().getId());
         boolean donoDoAg = a.getCliente().getId().equals(user.getId());
         if (!dono && !donoDoAg) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Não pode cancelar este agendamento");
@@ -206,6 +224,10 @@ public class AgendamentoService {
         m.put("servicoPreco", a.getServico().getPreco());
         m.put("servicoDuracao", a.getServico().getDuracaoMin());
         m.put("valorCobrado", a.getPrecoCobrado() != null ? a.getPrecoCobrado() : a.getServico().getPreco());
+        if (a.getBarbearia() != null) {
+            m.put("barbeariaId", a.getBarbearia().getId());
+            m.put("slug", a.getBarbearia().getSlug());
+        }
         return m;
     }
 }

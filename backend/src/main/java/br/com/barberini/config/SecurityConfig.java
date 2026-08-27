@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/health", "/health").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/assinatura/webhook").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/dono/**").hasRole("DONO")

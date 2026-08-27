@@ -1,28 +1,77 @@
-/* Persistência local + cache de catálogo + rascunho de agendamento */
+/* Persistência local (por slug) + cache de catálogo + rascunho + APIs do dono */
 
 window.Store = (() => {
-  const KEY = "barberini_v2";
-  const KEY_DRAFT = "barberini_draft";
-  const KEY_CATALOG = "barberini_catalog";
-  const KEY_SLOTS = "barberini_slots_cache";
+  const KEY_SLUG = "encaixe_slug";
+  const KEY_USER = "encaixe_user";
+  const KEY_LOJA = "encaixe_loja_meta";
+
+  let currentSlug = localStorage.getItem(KEY_SLUG) || "";
+  let lojaMeta = null;
+
+  try {
+    lojaMeta = JSON.parse(localStorage.getItem(KEY_LOJA) || "null");
+  } catch {
+    lojaMeta = null;
+  }
+
+  function keyState() {
+    const s = currentSlug || "_app";
+    return `encaixe_${s}_v1`;
+  }
+  function keyDraft() {
+    return `encaixe_${currentSlug || "_app"}_draft`;
+  }
+  function keyCatalog() {
+    return `encaixe_${currentSlug || "_app"}_catalog`;
+  }
+  function keySlots() {
+    return `encaixe_${currentSlug || "_app"}_slots`;
+  }
 
   const padrao = () => ({
-    usuario: null, // { id, nome, email, papel, demo? }
+    usuario: null,
     agendamentos: [],
   });
 
+  function lerUsuarioGlobal() {
+    try {
+      const raw = localStorage.getItem(KEY_USER);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function salvarUsuarioGlobal(usuario) {
+    if (usuario) localStorage.setItem(KEY_USER, JSON.stringify(usuario));
+    else localStorage.removeItem(KEY_USER);
+  }
+
   function ler() {
     try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return padrao();
-      return { ...padrao(), ...JSON.parse(raw) };
+      const raw = localStorage.getItem(keyState());
+      const base = padrao();
+      base.usuario = lerUsuarioGlobal();
+      if (!raw) return base;
+      const parsed = JSON.parse(raw);
+      return {
+        ...base,
+        ...parsed,
+        usuario: lerUsuarioGlobal() || parsed.usuario || null,
+      };
     } catch {
-      return padrao();
+      return { ...padrao(), usuario: lerUsuarioGlobal() };
     }
   }
 
   function salvar(state) {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    const { usuario, ...rest } = state;
+    if (usuario !== undefined) salvarUsuarioGlobal(usuario);
+    localStorage.setItem(
+      keyState(),
+      JSON.stringify({ ...rest, agendamentos: rest.agendamentos || [] })
+    );
   }
 
   function atualizar(fn) {
@@ -30,6 +79,25 @@ window.Store = (() => {
     const next = fn(state) || state;
     salvar(next);
     return next;
+  }
+
+  function aplicarBrandingLoja(loja) {
+    if (!loja) return;
+    lojaMeta = {
+      id: loja.id,
+      nome: loja.nome,
+      slug: loja.slug,
+      telefone: loja.telefone || null,
+      logoData: loja.logoData || null,
+      plano: loja.plano || null,
+      statusAssinatura: loja.statusAssinatura || null,
+    };
+    localStorage.setItem(KEY_LOJA, JSON.stringify(lojaMeta));
+    const E = window.ENCAIXE;
+    if (E) {
+      E.estabelecimento = (loja.nome || "Encaixe").toUpperCase();
+      E.nomeCompleto = loja.nome || "Encaixe";
+    }
   }
 
   function normServico(s) {
@@ -49,18 +117,14 @@ window.Store = (() => {
       iniciais: b.iniciais,
       cor: b.cor || "#3d3d3d",
       ativo: b.ativo !== false,
+      fotoData: b.fotoData || null,
     };
   }
 
   function fallbackCatalogo() {
-    const B = window.BARBERINI;
     return {
-      barbeiros: B.barbeiros.map((b, i) =>
-        normBarbeiro({ ...b, id: i + 1, ativo: true })
-      ),
-      servicos: B.servicos.map((s, i) =>
-        normServico({ ...s, id: i + 1, duracaoMin: s.duracao, ativo: true })
-      ),
+      barbeiros: [],
+      servicos: [],
       offline: true,
       atualizadoEm: null,
     };
@@ -68,7 +132,7 @@ window.Store = (() => {
 
   function lerCatalogo() {
     try {
-      const raw = localStorage.getItem(KEY_CATALOG);
+      const raw = localStorage.getItem(keyCatalog());
       if (!raw) return null;
       const c = JSON.parse(raw);
       return {
@@ -89,13 +153,13 @@ window.Store = (() => {
       offline,
       atualizadoEm: new Date().toISOString(),
     };
-    localStorage.setItem(KEY_CATALOG, JSON.stringify(payload));
+    localStorage.setItem(keyCatalog(), JSON.stringify(payload));
     return payload;
   }
 
   function catalogoAtual() {
     const cached = lerCatalogo();
-    if (cached && cached.barbeiros.length) return cached;
+    if (cached) return cached;
     return fallbackCatalogo();
   }
 
@@ -105,7 +169,7 @@ window.Store = (() => {
 
   function lerSlotsCache(key) {
     try {
-      const all = JSON.parse(localStorage.getItem(KEY_SLOTS) || "{}");
+      const all = JSON.parse(localStorage.getItem(keySlots()) || "{}");
       return all[key] || null;
     } catch {
       return null;
@@ -114,42 +178,41 @@ window.Store = (() => {
 
   function salvarSlotsCache(key, slots) {
     try {
-      const all = JSON.parse(localStorage.getItem(KEY_SLOTS) || "{}");
+      const all = JSON.parse(localStorage.getItem(keySlots()) || "{}");
       all[key] = { slots, em: Date.now() };
       const keys = Object.keys(all);
       if (keys.length > 80) {
         keys.sort((a, b) => (all[a].em || 0) - (all[b].em || 0));
         keys.slice(0, keys.length - 60).forEach((k) => delete all[k]);
       }
-      localStorage.setItem(KEY_SLOTS, JSON.stringify(all));
+      localStorage.setItem(keySlots(), JSON.stringify(all));
     } catch {
       /* ignore */
     }
   }
 
-  /** Invalida cache de slots (ex.: após o dono bloquear/liberar horário). */
   function limparSlotsCache(barbeiroId, data) {
     try {
       if (barbeiroId == null && !data) {
-        localStorage.removeItem(KEY_SLOTS);
+        localStorage.removeItem(keySlots());
         return;
       }
-      const all = JSON.parse(localStorage.getItem(KEY_SLOTS) || "{}");
+      const all = JSON.parse(localStorage.getItem(keySlots()) || "{}");
       Object.keys(all).forEach((k) => {
         const [bid, d] = k.split("|");
         if (barbeiroId != null && Number(bid) !== Number(barbeiroId)) return;
         if (data && d !== data) return;
         delete all[k];
       });
-      localStorage.setItem(KEY_SLOTS, JSON.stringify(all));
+      localStorage.setItem(keySlots(), JSON.stringify(all));
     } catch {
       /* ignore */
     }
   }
 
   function slotsFallback(barbeiroId, dataIso, duracaoMin, bloqueios = []) {
-    const U = window.BARBERINI.utils;
-    const B = window.BARBERINI;
+    const U = window.ENCAIXE.utils;
+    const B = window.ENCAIXE;
     const todos = U.gerarSlots();
     const ocupados = new Set(
       ler()
@@ -182,17 +245,85 @@ window.Store = (() => {
     });
   }
 
+  function exigirSlug() {
+    if (!currentSlug) {
+      const err = new Error("Informe a loja (slug) para continuar");
+      err.semSlug = true;
+      throw err;
+    }
+    return currentSlug;
+  }
+
+  function aplicarUsuarioAuth(data) {
+    window.API.setToken(data.token);
+    const usuario = { ...data.usuario, demo: false };
+    atualizar((s) => {
+      s.usuario = usuario;
+      return s;
+    });
+    if (usuario.slug) {
+      // dono: já sabe a loja
+      if (!currentSlug) {
+        currentSlug = usuario.slug;
+        localStorage.setItem(KEY_SLUG, currentSlug);
+      }
+      if (usuario.nomeBarbearia) {
+        aplicarBrandingLoja({
+          nome: usuario.nomeBarbearia,
+          slug: usuario.slug,
+          id: usuario.barbeariaId,
+        });
+      }
+    }
+    return usuario;
+  }
+
   return {
+    setLoja(slug) {
+      const s = String(slug || "")
+        .trim()
+        .toLowerCase();
+      if (!s) return currentSlug;
+      currentSlug = s;
+      localStorage.setItem(KEY_SLUG, currentSlug);
+      return currentSlug;
+    },
+
+    getSlug() {
+      return currentSlug || "";
+    },
+
+    clearLoja() {
+      currentSlug = "";
+      localStorage.removeItem(KEY_SLUG);
+      lojaMeta = null;
+      localStorage.removeItem(KEY_LOJA);
+      const E = window.ENCAIXE;
+      if (E) {
+        E.estabelecimento = "ENCAIXE";
+        E.nomeCompleto = "Encaixe";
+      }
+    },
+
+    getLoja() {
+      return lojaMeta;
+    },
+
+    setLojaMeta(loja) {
+      aplicarBrandingLoja(loja);
+      return lojaMeta;
+    },
+
     get() {
       return ler();
     },
 
     getUsuario() {
-      return ler().usuario;
+      return lerUsuarioGlobal() || ler().usuario;
     },
 
     isDono() {
-      const u = ler().usuario;
+      const u = this.getUsuario();
       return u && u.papel === "DONO";
     },
 
@@ -202,34 +333,38 @@ window.Store = (() => {
 
     async loginApi(email, senha) {
       const data = await window.API.post("/api/auth/login", { email, senha });
-      window.API.setToken(data.token);
-      const usuario = { ...data.usuario, demo: false };
-      atualizar((s) => {
-        s.usuario = usuario;
-        return s;
-      });
-      return usuario;
+      return aplicarUsuarioAuth(data);
     },
 
     async loginGoogle(credential) {
       const data = await window.API.post("/api/auth/google", { credential });
-      window.API.setToken(data.token);
-      const usuario = { ...data.usuario, demo: false };
-      atualizar((s) => {
-        s.usuario = usuario;
-        return s;
-      });
-      return usuario;
+      return aplicarUsuarioAuth(data);
     },
 
     async cadastroApi(nome, email, senha) {
       const data = await window.API.post("/api/auth/cadastro", { nome, email, senha });
-      window.API.setToken(data.token);
-      const usuario = { ...data.usuario, demo: false };
-      atualizar((s) => {
-        s.usuario = usuario;
-        return s;
+      return aplicarUsuarioAuth(data);
+    },
+
+    async criarLoja({ nome, email, senha, nomeBarbearia, slug, telefone }) {
+      const data = await window.API.post("/api/auth/criar-loja", {
+        nome,
+        email,
+        senha,
+        nomeBarbearia,
+        slug: slug || undefined,
+        telefone: telefone || undefined,
       });
+      const usuario = aplicarUsuarioAuth(data);
+      if (usuario.slug) this.setLoja(usuario.slug);
+      if (usuario.nomeBarbearia) {
+        aplicarBrandingLoja({
+          id: usuario.barbeariaId,
+          nome: usuario.nomeBarbearia,
+          slug: usuario.slug,
+          telefone: telefone || null,
+        });
+      }
       return usuario;
     },
 
@@ -242,14 +377,13 @@ window.Store = (() => {
         demo: true,
       };
       window.API.setToken(null);
-      return atualizar((s) => {
-        s.usuario = usuario;
-        return s;
-      }).usuario;
+      salvarUsuarioGlobal(usuario);
+      return usuario;
     },
 
     logout() {
       window.API.setToken(null);
+      salvarUsuarioGlobal(null);
       return atualizar((s) => {
         s.usuario = null;
         return s;
@@ -258,7 +392,7 @@ window.Store = (() => {
 
     getDraft() {
       try {
-        const raw = localStorage.getItem(KEY_DRAFT);
+        const raw = localStorage.getItem(keyDraft());
         if (!raw) return null;
         return JSON.parse(raw);
       } catch {
@@ -267,30 +401,35 @@ window.Store = (() => {
     },
 
     saveDraft(draft) {
-      localStorage.setItem(KEY_DRAFT, JSON.stringify(draft));
+      localStorage.setItem(keyDraft(), JSON.stringify(draft));
     },
 
     clearDraft() {
-      localStorage.removeItem(KEY_DRAFT);
+      localStorage.removeItem(keyDraft());
+    },
+
+    async carregarLojaPublica(slug) {
+      const s = slug || exigirSlug();
+      this.setLoja(s);
+      const loja = await window.API.get(`/api/public/${encodeURIComponent(s)}`);
+      aplicarBrandingLoja(loja);
+      return loja;
     },
 
     async syncCatalogo() {
+      const slug = exigirSlug();
       try {
         const [barbeiros, servicos] = await Promise.all([
-          window.API.get("/api/public/barbeiros"),
-          window.API.get("/api/public/servicos"),
+          window.API.get(`/api/public/${encodeURIComponent(slug)}/barbeiros`),
+          window.API.get(`/api/public/${encodeURIComponent(slug)}/servicos`),
         ]);
         return salvarCatalogo(barbeiros, servicos, false);
       } catch (e) {
         const cached = lerCatalogo();
-        if (cached && cached.barbeiros.length) {
+        if (cached && (cached.barbeiros.length || cached.servicos.length)) {
           return { ...cached, offline: true };
         }
-        return salvarCatalogo(
-          fallbackCatalogo().barbeiros,
-          fallbackCatalogo().servicos,
-          true
-        );
+        return salvarCatalogo([], [], true);
       }
     },
 
@@ -317,6 +456,7 @@ window.Store = (() => {
     },
 
     async fetchSlots(barbeiroId, data, servicoId) {
+      const slug = exigirSlug();
       const serv = servicoId ? this.getServico(servicoId) : null;
       const duracaoMin = serv?.duracaoMin || 30;
       const key = slotsCacheKey(barbeiroId, data, servicoId);
@@ -327,21 +467,23 @@ window.Store = (() => {
           data,
         });
         if (servicoId) q.set("servicoId", String(servicoId));
-        // bust cache do browser/proxy — bloqueios mudam o resultado
         q.set("_", String(Date.now()));
-        const res = await window.API.get(`/api/public/slots?${q}`);
+        const res = await window.API.get(
+          `/api/public/${encodeURIComponent(slug)}/slots?${q}`
+        );
         const slots = (res.slots || []).map((h) => String(h).substring(0, 5));
         salvarSlotsCache(key, slots);
         return slots;
       } catch (e) {
-        // Cache só se for bem recente (evita horário bloqueado continuar aparecendo)
         const cached = lerSlotsCache(key);
         if (cached && cached.slots && Date.now() - (cached.em || 0) < 10000) {
           return cached.slots;
         }
         let bloqueios = [];
         try {
-          bloqueios = await window.API.get(`/api/public/bloqueios?data=${encodeURIComponent(data)}`);
+          bloqueios = await window.API.get(
+            `/api/public/${encodeURIComponent(slug)}/bloqueios?data=${encodeURIComponent(data)}`
+          );
         } catch {
           /* offline total */
         }
@@ -367,6 +509,7 @@ window.Store = (() => {
         status: ag.status || "CONFIRMADO",
         semPreferencia: !!ag.semPreferencia,
         valorCobrado: ag.valorCobrado != null ? Number(ag.valorCobrado) : null,
+        slug: ag.slug || currentSlug || null,
       };
     },
 
@@ -419,7 +562,7 @@ window.Store = (() => {
       return ler()
         .agendamentos.filter((a) => {
           if (a.status === "CANCELADO") return false;
-          const d = window.BARBERINI.utils.parseISODate(a.data);
+          const d = window.ENCAIXE.utils.parseISODate(a.data);
           return d >= hoje && d <= limite;
         })
         .sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora));
@@ -489,6 +632,32 @@ window.Store = (() => {
       const res = await window.API.del(`/api/dono/bloqueios/${id}`);
       limparSlotsCache(meta.barbeiroId, meta.data);
       return res;
+    },
+
+    /**
+     * Sync em lote: { data, barbeiroId, bloqueios:[{hora,motivo}], removerIds:[...] }
+     */
+    async donoSyncBloqueios(payload) {
+      const res = await window.API.post("/api/dono/bloqueios/sync", payload);
+      limparSlotsCache(payload.barbeiroId, payload.data);
+      return res;
+    },
+
+    async donoLoja() {
+      const loja = await window.API.get("/api/dono/loja");
+      aplicarBrandingLoja(loja);
+      if (loja.slug) this.setLoja(loja.slug);
+      return loja;
+    },
+
+    async donoAtualizarLoja(body) {
+      const loja = await window.API.put("/api/dono/loja", body);
+      aplicarBrandingLoja(loja);
+      return loja;
+    },
+
+    async donoCheckoutAssinatura() {
+      return window.API.post("/api/dono/assinatura/checkout", {});
     },
   };
 })();

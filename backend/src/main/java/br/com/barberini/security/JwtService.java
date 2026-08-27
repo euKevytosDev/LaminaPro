@@ -23,16 +23,18 @@ public class JwtService {
         this.expiracaoMs = expiracaoMs;
     }
 
-    public String gerarToken(Long usuarioId, String email, String papel) {
+    public String gerarToken(Long usuarioId, String email, String papel, Long barbeariaId) {
         Date agora = new Date();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(usuarioId))
                 .claim("email", email)
                 .claim("papel", papel)
                 .issuedAt(agora)
-                .expiration(new Date(agora.getTime() + expiracaoMs))
-                .signWith(key)
-                .compact();
+                .expiration(new Date(agora.getTime() + expiracaoMs));
+        if (barbeariaId != null) {
+            builder.claim("barbeariaId", barbeariaId);
+        }
+        return builder.signWith(key).compact();
     }
 
     public Long extrairUsuarioId(String token) {
@@ -47,6 +49,12 @@ public class JwtService {
     public String extrairPapel(String token) {
         Object papel = parse(token).get("papel");
         return papel != null ? String.valueOf(papel) : "CLIENTE";
+    }
+
+    public Long extrairBarbeariaId(String token) {
+        Object v = parse(token).get("barbeariaId");
+        if (v == null) return null;
+        return Long.valueOf(String.valueOf(v));
     }
 
     public boolean valido(String token) {

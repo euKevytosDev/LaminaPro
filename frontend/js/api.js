@@ -1,4 +1,4 @@
-/* API Barberini — local IntelliJ / produção Render */
+/* API Encaixe — local IntelliJ / produção Render */
 
 window.API = (() => {
   const isLocal =
@@ -11,10 +11,21 @@ window.API = (() => {
 
   const BASE = isLocal
     ? "http://localhost:8080"
-    : localStorage.getItem("barberini_api_url") || API_BASE_PROD;
+    : localStorage.getItem("encaixe_api_url") ||
+      localStorage.getItem("barberini_api_url") ||
+      API_BASE_PROD;
 
   function token() {
-    return localStorage.getItem("barberini_token") || "";
+    let t = localStorage.getItem("encaixe_token");
+    if (!t) {
+      const legado = localStorage.getItem("barberini_token");
+      if (legado) {
+        localStorage.setItem("encaixe_token", legado);
+        localStorage.removeItem("barberini_token");
+        t = legado;
+      }
+    }
+    return t || "";
   }
 
   async function request(path, options = {}) {
@@ -61,8 +72,13 @@ window.API = (() => {
     put: (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) }),
     del: (path) => request(path, { method: "DELETE" }),
     setToken(t) {
-      if (t) localStorage.setItem("barberini_token", t);
-      else localStorage.removeItem("barberini_token");
+      if (t) {
+        localStorage.setItem("encaixe_token", t);
+        localStorage.removeItem("barberini_token");
+      } else {
+        localStorage.removeItem("encaixe_token");
+        localStorage.removeItem("barberini_token");
+      }
     },
     token,
   };

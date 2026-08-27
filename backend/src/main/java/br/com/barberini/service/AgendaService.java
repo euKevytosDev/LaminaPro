@@ -1,11 +1,14 @@
 package br.com.barberini.service;
 
 import br.com.barberini.model.Agendamento;
+import br.com.barberini.model.Barbeiro;
 import br.com.barberini.model.BloqueioHorario;
 import br.com.barberini.model.StatusAgendamento;
 import br.com.barberini.repository.AgendamentoRepository;
+import br.com.barberini.repository.BarbeiroRepository;
 import br.com.barberini.repository.BloqueioHorarioRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -26,10 +29,15 @@ public class AgendaService {
 
     private final AgendamentoRepository agendamentos;
     private final BloqueioHorarioRepository bloqueios;
+    private final BarbeiroRepository barbeiros;
 
-    public AgendaService(AgendamentoRepository agendamentos, BloqueioHorarioRepository bloqueios) {
+    public AgendaService(
+            AgendamentoRepository agendamentos,
+            BloqueioHorarioRepository bloqueios,
+            BarbeiroRepository barbeiros) {
         this.agendamentos = agendamentos;
         this.bloqueios = bloqueios;
+        this.barbeiros = barbeiros;
     }
 
     public List<LocalTime> gerarSlotsBase() {
@@ -43,8 +51,13 @@ public class AgendaService {
         return slots;
     }
 
+    @Transactional(readOnly = true)
     public List<String> slotsDisponiveis(Long barbeiroId, LocalDate data, int duracaoMin) {
         if (data.getDayOfWeek() == DayOfWeek.SUNDAY) return List.of();
+
+        Barbeiro barbeiro = barbeiros.findById(barbeiroId).orElse(null);
+        if (barbeiro == null || barbeiro.getBarbearia() == null) return List.of();
+        Long barbeariaId = barbeiro.getBarbearia().getId();
 
         Set<LocalTime> ocupados = new HashSet<>();
         for (Agendamento a : agendamentos.findOcupadosDoDia(
@@ -55,10 +68,10 @@ public class AgendaService {
                 cur = cur.plusMinutes(SLOT_MIN);
             }
         }
-        for (BloqueioHorario b : bloqueios.findByDataAndBarbeiroIsNull(data)) {
+        for (BloqueioHorario b : bloqueios.findByBarbeariaIdAndDataAndBarbeiroIsNull(barbeariaId, data)) {
             ocupados.add(b.getHora());
         }
-        for (BloqueioHorario b : bloqueios.findByDataAndBarbeiroId(data, barbeiroId)) {
+        for (BloqueioHorario b : bloqueios.findByBarbeariaIdAndDataAndBarbeiroId(barbeariaId, data, barbeiroId)) {
             ocupados.add(b.getHora());
         }
 

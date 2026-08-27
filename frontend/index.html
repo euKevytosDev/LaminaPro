@@ -5,35 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#1a1a1a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Barberini" />
-  <meta name="description" content="Agende seu horário na Barberini Barbearia" />
-  <title>Barberini Barbearia</title>
+  <meta name="apple-mobile-web-app-title" content="Encaixe" />
+  <meta name="description" content="Encaixe — agenda que encaixa. SaaS de agendamento para barbearias." />
+  <title>Encaixe</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/estilo.css" />
 </head>
 <body>
-  <div id="splash" class="splash" role="status" aria-label="Carregando Barberini">
+  <div id="splash" class="splash" role="status" aria-label="Carregando Encaixe">
     <div class="splash-conteudo">
-      <div class="login-b" style="margin:0 auto 18px;border-color:#fff;color:#fff">B</div>
-      <p class="splash-logo">BARBERINI</p>
-      <p class="splash-sub">Barbearia</p>
+      <div class="login-b" style="margin:0 auto 18px;border-color:#fff;color:#fff">E</div>
+      <p class="splash-logo">ENCAIXE</p>
+      <p class="splash-sub">Agenda que encaixa</p>
       <div class="splash-barra" aria-hidden="true"><div class="splash-barra-fill"></div></div>
     </div>
   </div>
 
   <div class="app-shell">
+    <!-- ENTRY / GATE -->
+    <section id="tela-entry" class="tela-entry oculto">
+      <div class="entry-marca">
+        <div class="login-b">E</div>
+        <h1 class="login-titulo">ENCAIXE</h1>
+        <p class="login-subtitulo">Agenda que encaixa</p>
+      </div>
+      <div class="entry-acoes">
+        <button type="button" class="btn-login-principal" id="btn-entry-entrar">Entrar na minha loja</button>
+        <button type="button" class="btn-login-ghost" id="btn-entry-criar">Criar minha barbearia</button>
+        <div class="entry-agendar">
+          <p class="entry-agendar-rotulo">Agendar (informe o link da loja)</p>
+          <div class="entry-slug-row">
+            <span class="entry-slug-prefix">#/loja/</span>
+            <input type="text" id="entry-slug" placeholder="demo" autocomplete="off" maxlength="80" />
+            <button type="button" class="btn-entry-ir" id="btn-entry-ir">Ir</button>
+          </div>
+          <button type="button" class="btn-login-ghost" id="btn-entry-demo">Abrir loja demo</button>
+        </div>
+      </div>
+      <p class="login-rodape">SaaS para barbearias — multi-loja</p>
+    </section>
+
+    <!-- CRIAR LOJA (onboarding dono) -->
+    <section id="tela-criar-loja" class="tela-criar-loja oculto">
+      <div class="criar-loja-topo">
+        <button type="button" class="btn-voltar-entry" id="btn-criar-voltar" aria-label="Voltar">←</button>
+        <div>
+          <h1>Criar minha barbearia</h1>
+          <p>Monte sua loja no Encaixe em menos de 2 minutos</p>
+        </div>
+      </div>
+      <form id="form-criar-loja" class="login-acoes criar-loja-form">
+        <label>
+          Seu nome
+          <input type="text" id="cl-nome" placeholder="Ex: Raian Kevin" maxlength="80" required autocomplete="name" />
+        </label>
+        <label>
+          E-mail
+          <input type="email" id="cl-email" placeholder="voce@email.com" required autocomplete="email" />
+        </label>
+        <label>
+          Senha
+          <input type="password" id="cl-senha" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" minlength="6" />
+        </label>
+        <label>
+          Nome da barbearia
+          <input type="text" id="cl-barbearia" placeholder="Ex: Barbearia Central" maxlength="120" required />
+        </label>
+        <label>
+          Link da loja
+          <span class="slug-preview"><span class="muted">#/loja/</span><strong id="cl-slug-preview">—</strong></span>
+          <input type="text" id="cl-slug" placeholder="barbearia-central" maxlength="80" pattern="[a-z0-9\-]+" />
+        </label>
+        <label>
+          Telefone <span class="opcional">(opcional)</span>
+          <input type="tel" id="cl-telefone" placeholder="(11) 99999-9999" maxlength="30" autocomplete="tel" />
+        </label>
+        <button type="submit" class="btn-login-principal" id="btn-criar-submit">Criar e entrar</button>
+      </form>
+    </section>
+
     <!-- LOGIN / CADASTRO -->
-    <section id="tela-login" class="tela-login">
+    <section id="tela-login" class="tela-login oculto">
       <div class="login-topo">
-        <span>Saiba mais</span>
+        <button type="button" class="btn-voltar-entry" id="btn-login-voltar" aria-label="Voltar">← Voltar</button>
         <span>BR</span>
       </div>
       <div class="login-marca">
-        <div class="login-b">B</div>
-        <h1 class="login-titulo">BARBERINI</h1>
-        <p class="login-subtitulo">Barbearia</p>
+        <div class="login-b" id="login-logo-letra">E</div>
+        <h1 class="login-titulo" id="login-marca-titulo">ENCAIXE</h1>
+        <p class="login-subtitulo" id="login-marca-sub">Agenda que encaixa</p>
       </div>
 
       <h2 id="auth-titulo" class="auth-titulo">Entrar</h2>
@@ -53,9 +115,8 @@
             Senha
             <input type="password" id="login-senha" placeholder="Sua senha" required autocomplete="current-password" minlength="4" />
           </label>
-          <button type="submit" class="btn-login-principal">Entrar na Barberini</button>
-          <button type="button" class="btn-login-ghost" id="btn-auth-cadastro">Criar conta</button>
-          <button type="button" class="btn-login-ghost" id="btn-login-demo">Entrar como demonstração</button>
+          <button type="submit" class="btn-login-principal">Entrar</button>
+          <button type="button" class="btn-login-ghost" id="btn-auth-cadastro">Criar conta de cliente</button>
         </form>
       </div>
 
@@ -86,14 +147,14 @@
       <header class="app-header">
         <button type="button" class="ico" aria-label="Informações">ⓘ</button>
         <div class="app-header-centro">
-          <strong>BARBERINI</strong>
+          <strong id="header-marca">ENCAIXE</strong>
           <span id="header-user">Cliente</span>
         </div>
         <button type="button" class="ico" aria-label="Notificações">🔔</button>
       </header>
 
       <div class="sub-header">
-        <div class="logo-mini">B</div>
+        <div class="logo-mini" id="logo-mini">E</div>
         <h2 id="titulo-aba">Agenda</h2>
       </div>
 
@@ -101,7 +162,7 @@
       <div class="aba-conteudo ativa" id="aba-agenda">
         <div id="agenda-vazia" class="agenda-vazia">
           <div class="aviso-ico">!</div>
-          <p>Você não tem compromissos para os próximos 30 dias.<br /><strong>BARBERINI</strong></p>
+          <p>Você não tem compromissos para os próximos 30 dias.<br /><strong id="agenda-vazia-marca">ENCAIXE</strong></p>
         </div>
         <div id="lista-agenda"></div>
       </div>
@@ -124,6 +185,7 @@
       <div class="aba-conteudo" id="aba-opcoes">
         <div class="opcoes-lista">
           <button type="button" class="opcao-item oculto" id="btn-painel-opcoes">📊 Painel do dono</button>
+          <button type="button" class="opcao-item oculto" id="btn-assinatura">✦ Assinar Encaixe Solo R$ 49,90</button>
           <button type="button" class="opcao-item" id="btn-relatar">🐛 Relatar um problema</button>
           <button type="button" class="opcao-item perigo" id="btn-sair">↩ Sair</button>
         </div>
@@ -137,6 +199,7 @@
           <button type="button" class="painel-nav-btn" data-secao="barbeiros">Barbeiros</button>
           <button type="button" class="painel-nav-btn" data-secao="servicos">Serviços</button>
           <button type="button" class="painel-nav-btn" data-secao="bloqueios">Horários</button>
+          <button type="button" class="painel-nav-btn" data-secao="loja">Loja</button>
         </nav>
         <div id="painel-conteudo" class="painel-conteudo"></div>
       </div>
@@ -169,7 +232,7 @@
           <header class="wizard-header">
             <div>
               <h2>Como deseja agendar?</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -193,7 +256,7 @@
           <header class="wizard-header">
             <div>
               <h2>Escolher Profissional</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -208,7 +271,7 @@
           <header class="wizard-header">
             <div>
               <h2>Escolher Serviços</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -236,7 +299,7 @@
           <header class="wizard-header">
             <div>
               <h2>Data e Horário</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -273,7 +336,7 @@
           <header class="wizard-header">
             <div>
               <h2>Criar Agendamento</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
@@ -288,7 +351,7 @@
               </div>
               <div>
                 <small>Estabelecimento</small>
-                <strong id="conf-estab">BARBERINI</strong>
+                <strong id="conf-estab">ENCAIXE</strong>
               </div>
             </div>
             <p class="conf-dica">Confira os serviços e horários escolhidos e confirme para finalizar o agendamento</p>
@@ -315,7 +378,7 @@
           <header class="wizard-header">
             <div>
               <h2 id="succ-titulo">Agendamento confirmado!</h2>
-              <p>BARBERINI</p>
+              <p class="marca-dinamica">ENCAIXE</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
