@@ -18,7 +18,8 @@ USER barberini
 
 COPY --from=build /app/target/barberini-*.jar app.jar
 
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 --enable-native-access=ALL-UNNAMED"
+# Northflank/Render free ~512 MB: JVM enxuta pra não estourar RAM
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -Xss256k --enable-native-access=ALL-UNNAMED"
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -jar app.jar"]

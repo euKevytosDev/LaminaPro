@@ -1,59 +1,74 @@
-# Deploy — Barberini
+# Deploy — Encaixe
 
 ## Já no ar
 
 | Peça | Onde |
 |------|------|
 | Front | https://eukevytosdev.github.io/Barberini/ |
-| API (após Render) | https://barberini-api.onrender.com |
 | Banco | Neon project `barberini` (`icy-surf-10621417`) |
+| API (preferida) | **Northflank** — ver abaixo |
+| API (legado) | https://barberini-api.onrender.com (Render free, dorme) |
 
-## Neon (já criado)
+## Neon (banco)
 
 Projeto: **barberini** · DB: `neondb` · região us-east-2
 
-No Render, use (Connection details → JDBC):
-
 ```text
-SPRING_DATASOURCE_URL=jdbc:postgresql://ep-fragrant-bread-ay731bvq-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
+SPRING_DATASOURCE_URL=jdbc:postgresql://ep-….aws.neon.tech/neondb?sslmode=require
 SPRING_DATASOURCE_USERNAME=neondb_owner
-SPRING_DATASOURCE_PASSWORD=<senha no console Neon / mensagem do Cursor>
+SPRING_DATASOURCE_PASSWORD=<console Neon>
 ```
 
-**Importante:** a URL **precisa** começar com `jdbc:postgresql://` (não só `postgresql://`).  
-Se colar sem o `jdbc:`, o driver quebra com `claims to not accept jdbcUrl`.
+A URL **precisa** começar com `jdbc:postgresql://`.
 
-> A senha não vai no Git. Copie no [console Neon](https://console.neon.tech/app/projects/icy-surf-10621417).
+## Northflank (API — recomendado)
 
-## Render free (Blueprint)
+Plano Sandbox free: compute always-on (sem cold start de 15 min).  
+Se um dia precisar, o upgrade pago (~US$ 5) é o próximo passo.
 
-1. Abra https://dashboard.render.com/blueprints  
-2. **New Blueprint Instance** → repo `euKevytosDev/Barberini`  
-3. Confirme o serviço `barberini-api` (plan free)  
-4. Preencha as 3 envs do Neon (`SPRING_DATASOURCE_*`)  
-5. Deploy  
+### Passo a passo
 
-Health check: `GET /api/health`
+1. Crie conta em https://app.northflank.com e um **Project** (ex.: `encaixe`).
+2. **Add service** → **Combined service** (build + deploy) ou **Deployment** from GitHub.
+3. Conecte o repo `euKevytosDev/Barberini`.
+4. Build:
+   - **Dockerfile path:** `backend/Dockerfile`
+   - **Build context:** `backend`
+5. Port: **8080** (ou a que o painel injetar em `PORT`).
+6. Health check: `GET /api/health` (path `/api/health`).
+7. Environment — copie de `.env.northflank.example` e preencha Neon + `APP_JWT_SECRET`.
+8. Deploy e copie a URL pública (ex.: `https://encaixe-api-….northflank.app`).
 
-Free do Render **dorme** após ~15 min sem uso — a 1ª request pode demorar ~30–50s.
+### Front apontando pra Northflank
+
+No navegador (Pages), abra o console uma vez:
+
+```js
+localStorage.setItem("encaixe_api_url", "https://SUA-URL.northflank.app");
+location.reload();
+```
+
+Ou altere o fallback em `frontend/js/api.js` (`API_BASE_PROD`) e faça push (Pages redeploya).
+
+### UptimeRobot (opcional na Northflank)
+
+No free always-on **não precisa** ping pra evitar cold start.  
+Se quiser monitoramento: `GET https://SUA-URL/api/health` a cada 5–10 min (timeout 30s).
 
 ## Login dono (seed)
 
-- E-mail: `dono@barberini.com`  
+- E-mail: `dono@barberini.com`
 - Senha: `dono123`
+- Loja demo: `#/loja/demo`
 
-## Login com Google
+## Login Google
 
-Client ID (Web): `868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com`
-
-No [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth Client → **Authorized JavaScript origins**:
+Authorized JavaScript origins:
 
 - `https://eukevytosdev.github.io`
 - `http://localhost:5173`
 
-No Render, env `GOOGLE_CLIENT_ID` já está no `render.yaml` (mesmo valor). Se o serviço já existia, adicione manualmente no dashboard e faça redeploy.
-
 ## Local
 
-- Front: `python3 -m http.server 5173` em `frontend/` → API `localhost:8080`  
-- Back: IntelliJ + Java 17 · perfil `local` (H2)
+- Front: `python3 -m http.server 5173` em `frontend/` → API `localhost:8080`
+- Back: Java 17 · perfil `local` (H2)

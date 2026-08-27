@@ -1,4 +1,4 @@
-/* API Encaixe — local IntelliJ / produção Render */
+/* API Encaixe — local / Northflank (preferida) / Render (legado) */
 
 window.API = (() => {
   const isLocal =
@@ -6,7 +6,7 @@ window.API = (() => {
     location.hostname === "127.0.0.1" ||
     location.protocol === "file:";
 
-  /** Produção: GitHub Pages → API no Render */
+  /** Produção: override com localStorage encaixe_api_url após deploy Northflank */
   const API_BASE_PROD = "https://barberini-api.onrender.com";
 
   const BASE = isLocal
