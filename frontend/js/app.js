@@ -375,16 +375,9 @@
     if (rota.tipo === "loja") {
       try {
         Store.setLoja(rota.slug);
+        Store.setUltimoModo("cliente");
         await Store.carregarLojaPublica(rota.slug);
-        const u = usuarioLogado();
-        if (u && !u.demo) {
-          await entrarApp({ modo: "loja" });
-        } else if (u) {
-          await entrarApp({ modo: "loja" });
-        } else {
-          // loja pública: permite navegar sem login (wizard pede na confirmação)
-          await entrarApp({ modo: "loja" });
-        }
+        await entrarApp({ modo: "loja" });
       } catch (e) {
         toast(e.message || "Loja não encontrada");
         setHash("/");
@@ -393,17 +386,26 @@
     }
 
     if (rota.tipo === "login") {
+      const u = await garantirSessao();
+      if (u && Store.temAuthReal() && !u.demo) {
+        if (rota.intent === "dono" && u.papel !== "DONO") {
+          mostrarLogin({ slug: Store.getSlug(), intent: rota.intent });
+          return;
+        }
+        await aposAuth(u, true);
+        return;
+      }
       mostrarLogin({ slug: Store.getSlug(), intent: rota.intent });
       return;
     }
 
     if (rota.tipo === "dono") {
-      const u = usuarioLogado();
       if (rota.pago === "ok") toast("Pagamento ok! A assinatura confirma em instantes.");
       if (rota.pago === "falhou") toast("Pagamento não concluído. Tente de novo nos Planos.");
+      const u = await garantirSessao();
       if (u && u.papel === "DONO" && Store.temAuthReal() && !u.demo) {
         if (u.slug) Store.setLoja(u.slug);
-        painelSecao = "planos";
+        painelSecao = rota.pago === "ok" ? "planos" : painelSecao;
         await entrarApp({ modo: "dono", tab: "painel" });
         return;
       }
@@ -411,14 +413,29 @@
       return;
     }
 
-    // entry / gate
-    const u = usuarioLogado();
-    if (u && u.papel === "DONO" && Store.temAuthReal() && !u.demo) {
-      if (u.slug) Store.setLoja(u.slug);
-      await entrarApp({ modo: "dono", tab: "painel" });
-      return;
+    // entry / gate — login automático se já entrou antes
+    const u = await garantirSessao();
+    if (u && Store.temAuthReal() && !u.demo) {
+      if (u.papel === "DONO") {
+        if (u.slug) Store.setLoja(u.slug);
+        await entrarApp({ modo: "dono", tab: "painel" });
+        return;
+      }
+      const slug = Store.getSlug();
+      if (slug) {
+        await entrarLoja(slug);
+        return;
+      }
     }
     mostrarEntry();
+  }
+
+  /** Token + usuário em cache; valida na API se necessário. */
+  async function garantirSessao() {
+    let u = usuarioLogado();
+    if (Store.temAuthReal() && u) return u;
+    if (Store.temAuthReal()) return Store.restaurarSessao();
+    return null;
   }
 
   function usuarioLogado() {
@@ -2260,14 +2277,16 @@
 
   /* ---------- Google Sign-In ---------- */
 
-  async function aposAuth(usuario) {
-    toast("Bem-vindo!");
+  async function aposAuth(usuario, silencioso = false) {
+    if (!silencioso) toast("Bem-vindo!");
     if (usuario.papel === "DONO") {
+      Store.setUltimoModo("dono");
       if (usuario.slug) Store.setLoja(usuario.slug);
-      setHash("/");
+      setHash("/dono");
       await entrarApp({ modo: "dono", tab: "painel" });
       return;
     }
+    Store.setUltimoModo("cliente");
     if (Store.getSlug() || rotaAtual.slug) {
       const slug = Store.getSlug() || rotaAtual.slug;
       setHash(`/loja/${slug}`);
@@ -2321,11 +2340,22 @@
     google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: handleGoogleCredential,
-      auto_select: false,
+      auto_select: true,
       cancel_on_tap_outside: true,
+      itp_support: true,
     });
     googlePronto = true;
     montarBotaoGoogle();
+  }
+
+  function tentarGoogleOneTap() {
+    if (!googlePronto || Store.temAuthReal()) return;
+    if (rotaAtual.tipo !== "entry" && rotaAtual.tipo !== "login") return;
+    try {
+      google.accounts.id.prompt();
+    } catch {
+      /* ignore */
+    }
   }
 
   /* ---------- criar loja / slug preview ---------- */
@@ -2344,7 +2374,13 @@
   /* ---------- boot ---------- */
 
   function bind() {
-    $("#btn-entry-dono")?.addEventListener("click", () => {
+    $("#btn-entry-dono")?.addEventListener("click", async () => {
+      Store.setUltimoModo("dono");
+      const u = await garantirSessao();
+      if (u?.papel === "DONO" && Store.temAuthReal()) {
+        await aposAuth(u, true);
+        return;
+      }
       mostrarLogin({ intent: "dono" });
     });
     $("#btn-entry-criar")?.addEventListener("click", () => {
@@ -2550,7 +2586,9 @@
     bind();
     restaurarDraft();
     initGoogleSignIn();
+    await Store.restaurarSessao();
     await onHashChange();
+    tentarGoogleOneTap();
 
     const splash = $("#splash");
     if (splash) {

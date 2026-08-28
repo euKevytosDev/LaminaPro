@@ -39,4 +39,9 @@ public class AuthController {
     public Map<String, Object> loginGoogle(@Valid @RequestBody GoogleLoginRequest request) {
         return authService.loginGoogle(request.credential());
     }
+
+    @GetMapping("/me")
+    public Map<String, Object> me() {
+        return authService.usuarioAtual();
+    }
 }

@@ -8,7 +8,9 @@ import br.com.barberini.model.Papel;
 import br.com.barberini.model.Usuario;
 import br.com.barberini.repository.BarbeariaRepository;
 import br.com.barberini.repository.UsuarioRepository;
+import br.com.barberini.security.AuthSupport;
 import br.com.barberini.security.JwtService;
+import br.com.barberini.security.UsuarioPrincipal;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -126,10 +128,26 @@ public class AuthService {
         return respostaAuth(u);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> usuarioAtual() {
+        UsuarioPrincipal p = AuthSupport.atual();
+        Usuario u = usuarios.findById(p.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida"));
+        return Map.of("usuario", mapUsuario(u));
+    }
+
     private Map<String, Object> respostaAuth(Usuario u) {
         Long barbeariaId = u.getBarbearia() != null ? u.getBarbearia().getId() : null;
         String token = jwt.gerarToken(u.getId(), u.getEmail(), u.getPapel().name(), barbeariaId);
 
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("token", token);
+        out.put("usuario", mapUsuario(u));
+        return out;
+    }
+
+    private Map<String, Object> mapUsuario(Usuario u) {
+        Long barbeariaId = u.getBarbearia() != null ? u.getBarbearia().getId() : null;
         Map<String, Object> usuario = new LinkedHashMap<>();
         usuario.put("id", u.getId());
         usuario.put("nome", u.getNome());
@@ -140,11 +158,7 @@ public class AuthService {
             usuario.put("slug", u.getBarbearia().getSlug());
             usuario.put("nomeBarbearia", u.getBarbearia().getNome());
         }
-
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("token", token);
-        out.put("usuario", usuario);
-        return out;
+        return usuario;
     }
 
     private String resolverSlugUnico(String nomeBarbearia) {

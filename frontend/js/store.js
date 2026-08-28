@@ -4,6 +4,7 @@ window.Store = (() => {
   const KEY_SLUG = "laminapro_slug";
   const KEY_USER = "laminapro_user";
   const KEY_LOJA = "laminapro_loja_meta";
+  const KEY_MODO = "laminapro_modo";
 
   /** Migra chaves antigas Encaixe/Barberini → Lâmina Pro (uma vez) */
   (function migrarKeys() {
@@ -274,6 +275,11 @@ window.Store = (() => {
   function aplicarUsuarioAuth(data) {
     window.API.setToken(data.token);
     const usuario = { ...data.usuario, demo: false };
+    if (usuario.papel === "DONO") {
+      localStorage.setItem(KEY_MODO, "dono");
+    } else {
+      localStorage.setItem(KEY_MODO, "cliente");
+    }
     atualizar((s) => {
       s.usuario = usuario;
       return s;
@@ -346,6 +352,49 @@ window.Store = (() => {
 
     temAuthReal() {
       return !!window.API.token();
+    },
+
+    setUltimoModo(modo) {
+      if (modo) localStorage.setItem(KEY_MODO, modo);
+    },
+
+    getUltimoModo() {
+      return localStorage.getItem(KEY_MODO) || "";
+    },
+
+    /** Restaura usuário a partir do JWT salvo (login automático). */
+    async restaurarSessao() {
+      if (!window.API.token()) return null;
+      try {
+        const data = await window.API.get("/api/auth/me");
+        if (!data?.usuario) return null;
+        const usuario = { ...data.usuario, demo: false };
+        salvarUsuarioGlobal(usuario);
+        atualizar((s) => {
+          s.usuario = usuario;
+          return s;
+        });
+        if (usuario.slug && !currentSlug) {
+          currentSlug = usuario.slug;
+          localStorage.setItem(KEY_SLUG, currentSlug);
+        }
+        if (usuario.papel === "DONO") this.setUltimoModo("dono");
+        else this.setUltimoModo("cliente");
+        if (usuario.nomeBarbearia && usuario.slug) {
+          aplicarBrandingLoja({
+            id: usuario.barbeariaId,
+            nome: usuario.nomeBarbearia,
+            slug: usuario.slug,
+          });
+        }
+        return usuario;
+      } catch (e) {
+        if (e.status === 401 || e.status === 403) {
+          window.API.setToken(null);
+          salvarUsuarioGlobal(null);
+        }
+        return null;
+      }
     },
 
     async loginApi(email, senha) {
