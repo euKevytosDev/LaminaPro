@@ -428,6 +428,21 @@ body {
   font-size: 1rem;
   line-height: 1;
 }
+.btn-google-agenda-card {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--preto);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--preto);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-google-agenda-card:active {
+  background: #f0f0f0;
+}
 
 .avatar {
   width: 42px;
@@ -1266,6 +1281,13 @@ body {
   line-height: 1.5;
   color: var(--texto-suave);
   font-size: 0.95rem;
+}
+.sucesso-dica {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--texto-suave);
+  line-height: 1.45;
+  max-width: 280px;
 }
 .sucesso-acoes {
   width: 100%;

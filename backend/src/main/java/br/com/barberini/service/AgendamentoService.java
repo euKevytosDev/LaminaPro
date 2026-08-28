@@ -63,7 +63,7 @@ public class AgendamentoService {
         Barbearia loja = barbearias.findBySlugIgnoreCase(req.slug().trim())
                 .filter(Barbearia::isAtivo)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não encontrada"));
-        assinatura.exigirAssinaturaAtiva(loja);
+        assinatura.exigirLojaAceitaAgendamentos(loja);
 
         Servico servico = servicos.findByIdAndBarbeariaId(req.servicoId(), loja.getId())
                 .filter(Servico::isAtivo)

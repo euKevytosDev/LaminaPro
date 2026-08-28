@@ -43,7 +43,7 @@
   let bloqueiosOcupados = new Set();
   let bloqueiosSlugDraftKey = "";
 
-  /** Lembretes browser */
+  /** Lembretes browser — desativado; cliente usa Google Agenda */
   let lembreteTimers = [];
   let lembreteIds = new Set();
   let notifPedida = false;
@@ -173,6 +173,11 @@
       "https://calendar.google.com/calendar/render?action=TEMPLATE" +
       `&text=${titulo}&dates=${start}/${end}&details=${detalhes}`
     );
+  }
+
+  function abrirGoogleAgenda(ag) {
+    if (!ag) return;
+    window.open(googleCalendarUrl(ag), "_blank", "noopener,noreferrer");
   }
 
   /* ---------- routing (hash) ---------- */
@@ -512,14 +517,10 @@
     if (nome === "painel") renderPainel();
   }
 
-  /* ---------- lembretes (Notification API, sem custo) ---------- */
+  /* ---------- lembretes — cliente usa Google Agenda ---------- */
 
   function pedirPermissaoNotificacao() {
-    if (!("Notification" in window) || notifPedida) return;
-    notifPedida = true;
-    if (Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
+    /* desativado */
   }
 
   function limparLembretes() {
@@ -528,32 +529,8 @@
     lembreteIds = new Set();
   }
 
-  function agendarLembretesBrowser(itens) {
-    limparLembretes();
-    if (!("Notification" in window) || Notification.permission !== "granted") {
-      return;
-    }
-    const MAX_MS = 6 * 60 * 60 * 1000; // cap 6h
-    const agora = Date.now();
-    itens.forEach((ag) => {
-      if (ag.status === "CANCELADO" || ag.status === "FINALIZADO") return;
-      const when = new Date(`${ag.data}T${String(ag.hora).substring(0, 5)}:00`).getTime();
-      const remindAt = when - 60 * 60 * 1000;
-      const delay = remindAt - agora;
-      if (delay <= 0 || delay > MAX_MS) return;
-      lembreteIds.add(String(ag.id));
-      const tid = setTimeout(() => {
-        try {
-          new Notification("Lembrete Lâmina Pro", {
-            body: `${ag.servicoNome || "Agendamento"} às ${String(ag.hora).substring(0, 5)}`,
-            tag: `laminapro-${ag.id}`,
-          });
-        } catch {
-          /* ignore */
-        }
-      }, delay);
-      lembreteTimers.push(tid);
-    });
+  function agendarLembretesBrowser() {
+    /* desativado */
   }
 
   /* ---------- agenda ---------- */
@@ -563,8 +540,6 @@
     const vazia = $("#agenda-vazia");
     const itens = Store.proximos(B().janelaAgendaDias);
 
-    pedirPermissaoNotificacao();
-    agendarLembretesBrowser(itens);
     atualizarMarcasUI();
 
     if (!itens.length) {
@@ -586,7 +561,6 @@
         const dia = U().diaSemanaCurto(d);
         const fim = ag.fim || U().fimAtendimento(ag.hora, serv?.duracaoMin || 30);
         const fechado = ag.status === "FINALIZADO" || ag.status === "NAO_COMPARECEU";
-        const temLembrete = lembreteIds.has(String(ag.id));
         return `
           <article class="card-agendamento" data-id="${ag.id}">
             <div class="card-agendamento-faixa"></div>
@@ -602,11 +576,11 @@
                   <p>${serv?.nome || ag.servicoNome || "Serviço"}</p>
                   <div class="tags-ag-inline">
                     ${fechado ? `<span class="badge-status ${ag.status.toLowerCase()}">${ag.status === "FINALIZADO" ? "Atendido" : "Não compareceu"}</span>` : ""}
-                    ${temLembrete ? `<span class="badge-lembrete">Lembrete</span>` : ""}
                   </div>
                 </div>
                 ${fechado ? "" : `<button type="button" class="btn-menu-ag" data-id="${ag.id}" aria-label="Opções">⋮</button>`}
               </div>
+              ${fechado ? "" : `<button type="button" class="btn-google-agenda-card" data-id="${ag.id}">Salvar no Google Agenda</button>`}
             </div>
           </article>`;
       })
@@ -616,6 +590,13 @@
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         cancelarAgendamento(btn.dataset.id);
+      });
+    });
+    $$(".btn-google-agenda-card", lista).forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const ag = itens.find((a) => String(a.id) === String(btn.dataset.id));
+        if (ag) abrirGoogleAgenda(ag);
       });
     });
   }
@@ -1136,10 +1117,16 @@
       Store.addAgendamento(ultimoAgendamento);
       Store.clearDraft();
       irPasso("sucesso");
+      abrirGoogleAgenda(ultimoAgendamento);
       renderAgenda();
     } catch (e) {
       if (e.offline) {
         toast("Servidor offline. Conecte o backend para confirmar.");
+      } else if (e.status === 503 || e.status === 402) {
+        toast(
+          e.message ||
+            "Esta barbearia não está aceitando agendamentos no momento."
+        );
       } else {
         toast(e.message || "Erro ao agendar");
       }
@@ -1158,13 +1145,19 @@
     const barb = Store.getBarbeiro(ag.barbeiroId);
     const fim = ag.fim || U().fimAtendimento(ag.hora, serv?.duracaoMin || 30);
 
-    $("#succ-titulo").textContent = "Agendamento confirmado!";
+    $("#succ-titulo").textContent = "Salve no Google Agenda";
     $("#succ-detalhe").textContent =
       `${serv?.nome || ag.servicoNome} com ${barb?.nome || ag.barbeiroNome}\n` +
       `${U().formatarDataBR(ag.data)} · ${ag.hora} até ${fim}`;
 
     const linkCal = $("#btn-google-cal");
-    if (linkCal) linkCal.href = googleCalendarUrl(ag);
+    if (linkCal) {
+      linkCal.href = googleCalendarUrl(ag);
+      linkCal.onclick = (ev) => {
+        ev.preventDefault();
+        abrirGoogleAgenda(ag);
+      };
+    }
   }
 
   function avancarPasso() {

@@ -13,16 +13,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
 
 @Configuration
+@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true", matchIfMissing = true)
 public class SeedConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SeedConfig.class);
+    private static final int MAX_BARBEIROS_DEMO = 2;
 
     @Bean
     CommandLineRunner seed(
@@ -55,8 +60,9 @@ public class SeedConfig {
                 if (barbeiros.countByBarbeariaId(demo.getId()) == 0) {
                     barbeiros.save(new Barbeiro(demo, "Abner Barber", "AB", "#3d3d3d"));
                     barbeiros.save(new Barbeiro(demo, "Julio César", "JC", "#555555"));
-                    barbeiros.save(new Barbeiro(demo, "Lucas Barber", "LB", "#2a2a2a"));
                 }
+                normalizarBarbeirosDemo(demo.getId(), barbeiros);
+
                 if (servicos.countByBarbeariaId(demo.getId()) == 0) {
                     Object[][] lista = {
                             {"Acabamento barba", "15", 15},
@@ -87,9 +93,23 @@ public class SeedConfig {
                     }
                 }
             } catch (Exception e) {
-                // Seed não pode derrubar o boot — falha de coluna/migração já é tratada no SchemaFixer
                 log.error("Seed falhou (API sobe mesmo assim): {}", e.getMessage());
             }
         };
+    }
+
+    /** Trial permite 2 barbeiros — mantém só os 2 primeiros ativos na demo. */
+    private static void normalizarBarbeirosDemo(Long barbeariaId, BarbeiroRepository barbeiros) {
+        List<Barbeiro> todos = barbeiros.findByBarbeariaIdOrderByNomeAsc(barbeariaId);
+        todos.sort(Comparator.comparing(Barbeiro::getId));
+        for (int i = 0; i < todos.size(); i++) {
+            Barbeiro b = todos.get(i);
+            boolean deveAtivar = i < MAX_BARBEIROS_DEMO;
+            if (b.isAtivo() != deveAtivar) {
+                b.setAtivo(deveAtivar);
+                barbeiros.save(b);
+                log.info("Demo barbeiro {} → ativo={}", b.getNome(), deveAtivar);
+            }
+        }
     }
 }

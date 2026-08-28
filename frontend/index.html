@@ -163,7 +163,7 @@
           <strong id="header-marca">LÂMINA PRO</strong>
           <span id="header-user">Cliente</span>
         </div>
-        <button type="button" class="ico" aria-label="Notificações">🔔</button>
+        <button type="button" class="ico oculto" id="btn-header-notif" aria-label="Notificações">🔔</button>
       </header>
 
       <div class="sub-header">
@@ -401,19 +401,20 @@
         <div class="passo" data-passo="sucesso">
           <header class="wizard-header">
             <div>
-              <h2 id="succ-titulo">Agendamento confirmado!</h2>
+              <h2 id="succ-titulo">Salve no Google Agenda</h2>
               <p class="marca-dinamica">LÂMINA PRO</p>
             </div>
             <button type="button" class="btn-x btn-fechar-wizard" aria-label="Fechar">×</button>
           </header>
           <div class="passo-corpo sucesso-corpo">
-            <div class="sucesso-ico">✓</div>
+            <div class="sucesso-ico">📅</div>
             <p id="succ-detalhe" class="sucesso-detalhe"></p>
+            <p class="sucesso-dica">O Google Agenda abriu em outra aba. Toque em <strong>Salvar</strong> para guardar o horário.</p>
             <div class="sucesso-acoes">
-              <a id="btn-google-cal" class="btn btn-outline btn-cal" href="#" target="_blank" rel="noopener">
-                Abrir no Google Agenda
+              <a id="btn-google-cal" class="btn btn-solid btn-cal" href="#" target="_blank" rel="noopener">
+                Abrir Google Agenda
               </a>
-              <button type="button" class="btn btn-solid" id="btn-succ-agenda">Ver na minha agenda</button>
+              <button type="button" class="btn btn-outline" id="btn-succ-agenda">Ver na minha agenda</button>
             </div>
           </div>
         </div>

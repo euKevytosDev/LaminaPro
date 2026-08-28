@@ -83,6 +83,14 @@ public class AssinaturaService {
                 "Seu período de teste acabou. Assine um plano para continuar usando o Lâmina Pro.");
     }
 
+    /** Bloqueia novos agendamentos de clientes quando a loja não tem plano ativo. */
+    public void exigirLojaAceitaAgendamentos(Barbearia loja) {
+        if (assinaturaAtiva(loja)) return;
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "Esta barbearia não está aceitando agendamentos no momento. "
+                        + "Entre em contato com a loja ou tente mais tarde.");
+    }
+
     public boolean assinaturaAtiva(Barbearia loja) {
         if (loja == null) return false;
         StatusAssinatura st = loja.getStatusAssinatura();
@@ -212,7 +220,7 @@ public class AssinaturaService {
 
         loja.setPlano(plano.faixa());
         loja.setPlanoPeriodo(plano.periodo());
-        loja.setPlanoExpiraEm(base.plusDays(35));
+        loja.setPlanoExpiraEm(base.plusDays(30));
         loja.setStatusAssinatura(StatusAssinatura.ATIVA);
         loja.setPagamentoOrigem("WEB_MP_RECORRENTE");
         loja.setMercadoPagoPreapprovalId(preapprovalId.trim());

@@ -1,0 +1,25 @@
+# Copie para as variáveis da Northflank (laminapro-api)
+SPRING_PROFILES_ACTIVE=postgres
+SPRING_DATASOURCE_URL=jdbc:postgresql://HOST/neondb?sslmode=require
+SPRING_DATASOURCE_USERNAME=neondb_owner
+SPRING_DATASOURCE_PASSWORD=
+
+# Obrigatório em produção — gere com: openssl rand -base64 48
+APP_JWT_SECRET=
+
+APP_PUBLIC_URL=https://eukevytosdev.github.io/LaminaPro
+GOOGLE_CLIENT_ID=868389533637-d3l4a0mrnnbf7i1h34cd0mts996sb6pc.apps.googleusercontent.com
+
+MERCADOPAGO_ACCESS_TOKEN=
+# Painel MP → Webhooks → Configurar → revelar assinatura secreta
+MERCADOPAGO_WEBHOOK_SECRET=
+
+APP_ASSINATURA_WEBHOOK_URL=https://p01--laminapro-api--w5zz78kgqjtj.code.run/api/assinatura/webhook
+APP_ASSINATURA_TRIAL_DIAS=7
+
+# Seed demo: desligado em produção (recomendado)
+APP_SEED_ENABLED=false
+# Se precisar do demo: APP_SEED_ENABLED=true + senha forte (12+ chars)
+APP_SEED_DONO_EMAIL=dono@laminapro.app
+APP_SEED_DONO_SENHA=
+APP_SEED_DONO_NOME=Dono LaminaPro

@@ -5,7 +5,11 @@ import br.com.barberini.model.Barbearia;
 import br.com.barberini.security.AuthSupport;
 import br.com.barberini.security.TenantSupport;
 import br.com.barberini.service.AssinaturaService;
+import br.com.barberini.service.MercadoPagoWebhookValidator;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -15,10 +19,15 @@ public class AssinaturaController {
 
     private final AssinaturaService assinatura;
     private final TenantSupport tenant;
+    private final MercadoPagoWebhookValidator webhookValidator;
 
-    public AssinaturaController(AssinaturaService assinatura, TenantSupport tenant) {
+    public AssinaturaController(
+            AssinaturaService assinatura,
+            TenantSupport tenant,
+            MercadoPagoWebhookValidator webhookValidator) {
         this.assinatura = assinatura;
         this.tenant = tenant;
+        this.webhookValidator = webhookValidator;
     }
 
     @GetMapping("/api/dono/assinatura/catalogo")
@@ -43,6 +52,7 @@ public class AssinaturaController {
 
     @RequestMapping(value = "/api/assinatura/webhook", method = {RequestMethod.GET, RequestMethod.POST})
     public Map<String, String> webhook(
+            HttpServletRequest request,
             @RequestParam(value = "data.id", required = false) String dataId,
             @RequestParam(value = "id", required = false) String id,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -53,6 +63,24 @@ public class AssinaturaController {
                 paymentId = String.valueOf(mapa.get("id"));
             }
         }
+
+        if (webhookValidator.configurado()) {
+            String dataIdAssinatura = paymentId;
+            if (dataIdAssinatura == null && body != null) {
+                Object data = body.get("data");
+                if (data instanceof Map<?, ?> mapa && mapa.get("id") != null) {
+                    dataIdAssinatura = String.valueOf(mapa.get("id"));
+                }
+            }
+            boolean ok = webhookValidator.valido(
+                    request.getHeader("x-signature"),
+                    request.getHeader("x-request-id"),
+                    dataIdAssinatura);
+            if (!ok) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Assinatura do webhook inválida");
+            }
+        }
+
         if (paymentId != null) {
             try {
                 String type = body != null ? String.valueOf(body.getOrDefault("type", "")) : "";
